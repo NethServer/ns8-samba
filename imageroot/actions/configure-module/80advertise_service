@@ -46,6 +46,8 @@ data={
     "tls_verify": "off",
     "bind_dn": svcuser + "@" + domain,
     "bind_password": svcpass,
+    "hidden_users": "Guest,krbtgt,ldapservice",
+    "hidden_groups": "DnsUpdateProxy,Domain Computers,Domain Controllers,Domain Guests,Domain Users,Group Policy Creator Owners,Read-only Domain Controllers,Protected Users",
 }
 
 # Advertise this new account provider service instance:
