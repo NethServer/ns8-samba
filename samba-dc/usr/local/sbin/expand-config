@@ -53,6 +53,11 @@ cat - >/etc/samba/smb.conf <<EOF
         log level = ${SAMBA_LOGLEVEL}
         acl_xattr:security_acl_name = user.NTACL
         include = /etc/samba/include.conf
+        usershare path = /var/lib/samba/usershares
+        usershare max shares = 1024
+        usershare allow guests = yes
+        map to guest = bad user
+        guest account = nobody
 
 [sysvol]
         path = /var/lib/samba/sysvol
