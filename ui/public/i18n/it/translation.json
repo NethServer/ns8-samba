@@ -1,7 +1,7 @@
 {
     "common": {
         "required": "Obbligatorio",
-        "processing": "Elaborazione in corso...",
+        "processing": "In elaborazione…",
         "work_in_progress": "In lavorazione",
         "save": "Salva",
         "close": "Chiudi"
@@ -26,12 +26,6 @@
         "go_to_domains_and_users": "Andare su Domini e utenti",
         "shared_folders": "Cartelle Condivise",
         "go_to_shared_folders": "Vai a cartelle condivise"
-    },
-    "settings": {
-        "save": "Salva",
-        "title": "Impostazioni",
-        "configure_instance": "Configura {instance}",
-        "test_field": "Campo di test"
     },
     "error": {
         "error": "Errore",
