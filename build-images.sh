@@ -10,7 +10,7 @@ user_manager_version=v1.0.1
 container="ubuntu-working-container"
 # Prepare a local Ubuntu-based samba image
 if ! buildah inspect --type container "${container}" &>/dev/null; then
-    container=$(buildah from --name "${container}" docker.io/library/ubuntu:24.04)
+    container=$(buildah from --name "${container}" docker.io/library/ubuntu:24.10)
     buildah run "${container}" -- bash <<'EOF'
 set -e
 apt-get update
