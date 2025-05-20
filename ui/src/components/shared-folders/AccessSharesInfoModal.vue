@@ -55,7 +55,7 @@
         light
         hideExpandButton
       >
-        \{{ configuration && configuration.nbdomain }}\john.doe
+        {{ configuration && configuration.nbdomain }}\john.doe
         <br />
         <br />
         john.doe@{{ configuration && configuration.realm }}
