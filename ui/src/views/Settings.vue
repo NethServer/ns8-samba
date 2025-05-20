@@ -74,6 +74,7 @@
                 :options="ipAddresses"
                 :disabled="loading.setConfiguration"
                 :readonly="!ipAddressAlterable"
+                :light="!ipAddressAlterable"
                 tooltipAlignment="start"
                 tooltipDirection="right"
                 class="mg-bottom-6"
