@@ -9,6 +9,9 @@ import os
 import yaml
 import agent
 
+if not os.getenv("IPADDRESS"):
+    sys.exit(0)
+
 module_id = os.environ['MODULE_ID']
 agent_id = os.environ['AGENT_ID']
 node_id = int(os.environ['NODE_ID'])
