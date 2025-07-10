@@ -70,7 +70,7 @@ def get_recycle_repository(share_name):
             stderr=subprocess.DEVNULL).strip()
     except subprocess.CalledProcessError as e:
         repodir = '' # recycle is disabled
-    return repodir
+    return repodir.removesuffix("/%U")
 
 def run_daemon():
     while True:
