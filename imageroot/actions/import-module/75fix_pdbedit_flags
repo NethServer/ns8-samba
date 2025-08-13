@@ -1,0 +1,35 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2025 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+exec 1>&2
+set -e
+
+# This script modifies all users with the [UX] flag to [U] in a Samba domain.
+# It excludes the 'ldapservice' user from modification.
+# see issue https://github.com/NethServer/dev/issues/7558
+
+changed=0
+for user in $(podman exec samba-dc pdbedit -L | cut -d: -f1); do
+    # Ignore ldapservice
+    if [ "$user" = "ldapservice" ]; then
+        echo "ldapservice user ignored."
+        continue
+    fi
+    # Try to get flags for this user, suppress error output for nobody
+    flags=$(podman exec samba-dc pdbedit -v "$user" 2>/dev/null | grep "Account Flags:" | awk '{print $3}')
+    if [[ "$flags" == [UX* ]]; then
+        echo "Modifying user: $user - Flags before: $flags]"
+        podman exec samba-dc pdbedit -r "$user" -c "[]" > /dev/null 2>&1
+        changed=1
+    fi
+done
+
+if [[ $changed -eq 0 ]]; then
+    echo "No user with the [UX] flag found (excluding ldapservice). Nothing to do."
+else
+    echo "All users (excluding ldapservice) with the [UX] flag have been changed to [U]."
+fi
