@@ -263,10 +263,11 @@ def get_user_account_control(user):
     return dn_str, user_account_control
 
 def set_user_account_control(dn_str, user_account_control, no_password_expiration):
-    if no_password_expiration == True and ( user_account_control & 65536 ) == 0:
-        user_account_control += 65536
-    elif no_password_expiration == False and ( user_account_control >=  66048 ):
-        user_account_control -= 65536
+    UF_DONT_EXPIRE_PASSWORD = 0x10000
+    if no_password_expiration == True and not ( user_account_control & UF_DONT_EXPIRE_PASSWORD ):
+        user_account_control |= UF_DONT_EXPIRE_PASSWORD # set the flag
+    elif no_password_expiration == False and ( user_account_control & ~UF_DONT_EXPIRE_PASSWORD ):
+        user_account_control &= ~UF_DONT_EXPIRE_PASSWORD # clear the flag
     else:
         user_account_control = None  # No change needed
     if user_account_control is not None:
