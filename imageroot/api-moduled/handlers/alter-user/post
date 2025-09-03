@@ -25,6 +25,8 @@ if 'password' in request:
     password = request['password']
     inputdata = password + "\n" + password + "\n"
     setpassword_cmd = sambatool_cmd + ['user', 'setpassword', user]
+    if request['must_change_password']:
+        setpassword_cmd += ['--must-change-at-next-login']
     subprocess.run(setpassword_cmd, input=inputdata,
                    stdout=sys.stderr, check=True, text=True)
 
