@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env python3
 
 #
 # Copyright (C) 2025 Nethesis S.r.l.
@@ -7,29 +7,22 @@
 
 # This script updates the api-moduled.env file to include PYTHONPATH
 # in the AMLD_EXPORT_ENV variable if it's not already present.
+import sys
+import agent
 
-set -e
-exec 1>&2
+file = "api-moduled.env"
 
-file="api-moduled.env"
+# Read the environment file as a dictionary
+env_file = agent.read_envfile(file)
 
-if [[ ! -f $file ]]; then
-    echo "$file file not found!"
-    exit 0
-fi
-
-# Read the current value
-current=$(grep '^AMLD_EXPORT_ENV=' "$file" | cut -d= -f2-)
-
-# Check if PYTHONPATH is present
-if [[ "$current" =~ PYTHONPATH ]]; then
-    echo "PYTHONPATH already in AMLD_EXPORT_ENV, skipping..."
-    exit 0
-fi
+amld_export_env = env_file.get("AMLD_EXPORT_ENV", "")
+if "PYTHONPATH" in amld_export_env.split():
+    sys.exit(0)
 
 # Add PYTHONPATH at the end
-new="$current PYTHONPATH"
+python_path = f"{amld_export_env} PYTHONPATH".strip()
+env_file["AMLD_EXPORT_ENV"] = python_path
 
-# Replace the line in the file
-sed -i "s|^AMLD_EXPORT_ENV=.*|AMLD_EXPORT_ENV=$new|" "$file"
-echo "AMLD_EXPORT_ENV updated: $new"
+# Write the updated environment back to the file
+agent.write_envfile(file, env_file)
+print(f"AMLD_EXPORT_ENV updated: {python_path}", file=sys.stderr)
