@@ -20,7 +20,7 @@ if "PYTHONPATH" in amld_export_env.split():
     sys.exit(0)
 
 # Add PYTHONPATH at the end
-python_path = f"{amld_export_env} PYTHONPATH".strip()
+python_path = f"{amld_export_env} PYTHONPATH"
 env_file["AMLD_EXPORT_ENV"] = python_path
 
 # Write the updated environment back to the file
