@@ -1,0 +1,35 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2025 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# This script updates the api-moduled.env file to include PYTHONPATH
+# in the AMLD_EXPORT_ENV variable if it's not already present.
+
+set -e
+exec 1>&2
+
+file="api-moduled.env"
+
+if [[ ! -f $file ]]; then
+    echo "$file file not found!"
+    exit 0
+fi
+
+# Read the current value
+current=$(grep '^AMLD_EXPORT_ENV=' "$file" | cut -d= -f2-)
+
+# Check if PYTHONPATH is present
+if [[ "$current" =~ PYTHONPATH ]]; then
+    echo "PYTHONPATH already in AMLD_EXPORT_ENV, skipping..."
+    exit 0
+fi
+
+# Add PYTHONPATH at the end
+new="$current PYTHONPATH"
+
+# Replace the line in the file
+sed -i "s|^AMLD_EXPORT_ENV=.*|AMLD_EXPORT_ENV=$new|" "$file"
+echo "AMLD_EXPORT_ENV updated: $new"
