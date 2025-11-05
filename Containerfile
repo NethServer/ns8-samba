@@ -19,7 +19,7 @@ RUN set -e \
         smbclient=2:4.19.5+dfsg-4ubuntu9.4 \
         libnss-winbind=2:4.19.5+dfsg-4ubuntu9.4 \
         rsync=3.2.7-1ubuntu1.2 \
-        plocate=1.1.19-2ubuntu2 \
+        plocate=1.1.23-1 \
         wsdd=2:0.7.1-5 \
         syslog-ng-core=4.3.1-2build5 \
         syslog-ng-mod-sql=4.3.1-2build5 \
