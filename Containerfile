@@ -23,7 +23,7 @@ RUN set -e \
         wsdd=2:0.7.1-5 \
         syslog-ng-core=4.3.1-2build5 \
         syslog-ng-mod-sql=4.3.1-2build5 \
-        libdbd-pgsql=0.9.0-12 \
+        libdbd-pgsql=0.9.0-13 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/* \
               /usr/share/locales/* /var/cache/* /tmp/* /var/log/*
