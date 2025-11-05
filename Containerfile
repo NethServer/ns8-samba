@@ -11,7 +11,7 @@ RUN set -e \
         winbind=2:4.19.5+dfsg-4ubuntu9.4 \
         krb5-user=1.20.1-6ubuntu2.6 \
         iputils-ping=3:20240117-1ubuntu0.1 \
-        bzip2=1.0.8-5.1build0.1 \
+        bzip2=1.0.8-6 \
         ldb-tools=2:2.8.0+samba4.19.5+dfsg-4ubuntu9.4 \
         chrony=4.5-1ubuntu4.2 \
         dnsutils=1:9.18.39-0ubuntu0.24.04.2 \
