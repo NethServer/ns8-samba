@@ -18,6 +18,7 @@ RUN set -e \
         chrony=4.5-1ubuntu4.2 \
         dnsutils=1:9.18.39-0ubuntu0.24.04.2 \
         acl=2.3.2-1build1.1 \
+        attr=1:2.5.2-1build1.1 \
         smbclient=2:4.19.5+dfsg-4ubuntu9.4 \
         libnss-winbind=2:4.19.5+dfsg-4ubuntu9.4 \
         rsync=3.2.7-1ubuntu1.2 \
