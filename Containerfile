@@ -17,7 +17,7 @@ RUN set -e \
         dnsutils=1:9.18.39-0ubuntu0.24.04.2 \
         acl=2.3.2-1build1.1 \
         smbclient=2:4.19.5+dfsg-4ubuntu9.4 \
-        libnss-winbind=2:4.19.5+dfsg-4ubuntu9.4 \
+        libnss-winbind=2:4.22.4+dfsg-1~deb13u1 \
         rsync=3.2.7-1ubuntu1.2 \
         plocate=1.1.19-2ubuntu2 \
         wsdd=2:0.7.1-5 \
