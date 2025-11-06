@@ -6,8 +6,7 @@ images=()
 repobase="${REPOBASE:-ghcr.io/nethserver}"
 user_manager_version=v1.2.4
 
-podman build --target ubuntu-samba-base -t ${repobase}/ubuntu-samba:latest .
-podman build --squash -t ${repobase}/samba-dc .
+podman build -t ${repobase}/samba-dc .
 images+=("${repobase}/samba-dc")
 
 #

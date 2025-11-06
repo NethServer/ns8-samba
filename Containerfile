@@ -3,11 +3,13 @@ FROM docker.io/library/ubuntu:24.04 AS ubuntu-samba-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# renovate-ubuntu: suite=noble
+# renovate-ubuntu: suite=noble-security
 RUN set -e \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
         samba=2:4.19.5+dfsg-4ubuntu9.4 \
+        samba-ad-dc=2:4.19.5+dfsg-4ubuntu9.4 \
+        samba-ad-provision=2:4.19.5+dfsg-4ubuntu9.4 \
         winbind=2:4.19.5+dfsg-4ubuntu9.4 \
         krb5-user=1.20.1-6ubuntu2.6 \
         iputils-ping=3:20240117-1ubuntu0.1 \
@@ -25,8 +27,11 @@ RUN set -e \
         syslog-ng-mod-sql=4.3.1-2build5 \
         libdbd-pgsql=0.9.0-12 \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/* \
-              /usr/share/locales/* /var/cache/* /tmp/* /var/log/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/cache/apt/archives/*.deb \
+    && rm -rf /tmp/* /var/tmp/* \
+    && find /usr/share/doc -depth -type f ! -name copyright -delete \
+    && find /usr/share/man -type f -delete
 
 # Stage 2: Samba DC image
 FROM ubuntu-samba-base
