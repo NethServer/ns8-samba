@@ -13,7 +13,7 @@ RUN set -e \
         iputils-ping=3:20240117-1ubuntu0.1 \
         bzip2=1.0.8-5.1build0.1 \
         ldb-tools=2:2.8.0+samba4.19.5+dfsg-4ubuntu9.4 \
-        chrony=4.5-1ubuntu4.2 \
+        chrony=4.6.1-3 \
         dnsutils=1:9.18.39-0ubuntu0.24.04.2 \
         acl=2.3.2-1build1.1 \
         smbclient=2:4.19.5+dfsg-4ubuntu9.4 \
