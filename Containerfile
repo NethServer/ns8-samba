@@ -9,7 +9,7 @@ RUN set -e \
     && apt-get install -y --no-install-recommends \
         samba=2:4.19.5+dfsg-4ubuntu9.4 \
         winbind=2:4.19.5+dfsg-4ubuntu9.4 \
-        krb5-user=1.20.1-6ubuntu2.6 \
+        krb5-user=1.21.3-5 \
         iputils-ping=3:20240117-1ubuntu0.1 \
         bzip2=1.0.8-5.1build0.1 \
         ldb-tools=2:2.8.0+samba4.19.5+dfsg-4ubuntu9.4 \
