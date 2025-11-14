@@ -39,8 +39,8 @@ ExecStart=/usr/bin/podman run \
     --env-file=timescaledb.env \
     --volume=data:/var/lib/samba:z \
     --volume=config:/etc/samba:z \
-    --volume=shares:/srv/shares:z \
-    --volume=homes:/srv/homes:z \
+    --volume=shares:/srv/shares \
+    --volume=homes:/srv/homes \
     --init \
     ${SAMBA_DC_IMAGE}
 
