@@ -3,7 +3,7 @@ FROM docker.io/library/ubuntu:noble-20251001 AS ubuntu-samba-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# renovate-ubuntu: suite=noble-security
+# renovate-ubuntu: suite=noble
 RUN set -e \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
