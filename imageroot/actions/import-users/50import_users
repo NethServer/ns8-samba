@@ -23,14 +23,32 @@ import sys
 import subprocess
 import samba
 
-request = json.load(sys.stdin)  # list of user objects
+request = json.load(sys.stdin)  # object with skip_existing + records list
 sambatool_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool']
 
-# 1. Create users (samba-tool only for creation + must-change flag)
-for item in request:
-    user = item['user']
-    password = item.get('password', '')
-    must_change = item.get('must_change_password') is True
+skip_existing = request.get('skip_existing', False)
+records = request.get('records', [])
+
+# Track which users exist already (avoid double queries)
+existing_users = set()
+for rec in records:
+    user = rec['user']
+    testexists_cmd = sambatool_cmd + ['user', 'show', user]
+    proc = subprocess.run(testexists_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
+    if proc.returncode == 0:
+        existing_users.add(user)
+
+# 1. Create users (only missing ones, or all if they don't exist). If skip_existing True, skip creation.
+for rec in records:
+    user = rec['user']
+    if user in existing_users and skip_existing:
+        continue  # leave existing untouched
+    if user in existing_users and not skip_existing:
+        # user exists and must be updated, not created
+        continue
+
+    password = rec.get('password', '')
+    must_change = rec.get('must_change_password') is True
 
     adduser_cmd = sambatool_cmd + ['user', 'create', user]
     if must_change:
@@ -44,27 +62,46 @@ for item in request:
 
     subprocess.run(adduser_cmd, input=inputdata, stdout=sys.stderr, check=True, text=True)
 
-# 2. Collect group memberships to batch addmembers calls
-#    {group: [user1, user2, ...]}
+# 2. Handle password reset for existing users when skip_existing == False and password provided
+for rec in records:
+    user = rec['user']
+    if user in existing_users and not skip_existing and 'password' in rec:
+        password = rec['password']
+        must_change = rec.get('must_change_password') is True
+        inputdata = password + "\n" + password + "\n"
+        setpwd_cmd = sambatool_cmd + ['user', 'setpassword', user]
+        if must_change:
+            setpwd_cmd += ['--must-change-at-next-login']
+        subprocess.run(setpwd_cmd, input=inputdata, stdout=sys.stderr, check=True, text=True)
+
+# 3. Collect group memberships additions (we do not remove any existing membership)
 add_groups_map = {}
-for item in request:
-    for g in item.get('groups', []) or []:
-        add_groups_map.setdefault(g, []).append(item['user'])
+for rec in records:
+    if skip_existing and rec['user'] in existing_users:
+        continue  # do not touch groups of existing users
+    for g in rec.get('groups', []) or []:
+        add_groups_map.setdefault(g, []).append(rec['user'])
 
 for group, members in add_groups_map.items():
-    # samba-tool group addmembers group user1 user2 ...
     cmd = sambatool_cmd + ['group', 'addmembers', group] + members
     subprocess.run(cmd, stdout=sys.stderr, check=True, text=True)
 
-# 3. Collect DN and prepare single ldbmodify for mail/displayName/userAccountControl changes
+# 4. Collect DN and prepare single ldbmodify for mail/displayName/userAccountControl changes
 ldb_entries = []
-for item in request:
-    user = item['user']
-    mail = item.get('mail', '')
-    display_name = item.get('display_name', '')
-    no_pwd_exp = item.get('no_password_expiration')
+for rec in records:
+    user = rec['user']
+    # Skip attribute updates on existing if skip_existing True
+    if skip_existing and user in existing_users:
+        continue
 
-    # Retrieve DN and (optionally) userAccountControl
+    mail = rec.get('mail')  # could be None
+    display_name = rec.get('display_name')
+    no_pwd_exp = rec.get('no_password_expiration')
+
+    # If no attributes to update, skip querying
+    if mail is None and display_name is None and no_pwd_exp is None:
+        continue
+
     getdn_cmd = sambatool_cmd + ['user', 'show', user, '--attributes=dn,userAccountControl']
     proc = subprocess.run(getdn_cmd, check=True, capture_output=True, text=True)
     dn_line = None
@@ -75,16 +112,19 @@ for item in request:
         elif line.startswith('userAccountControl:'):
             uac_line = line
     if not dn_line:
-        continue  # skip if DN not found (should not happen)
+        continue
 
     modifications = []
-    # mail
-    if mail:
-        modifications.append('replace: mail\nmail: ' + mail)
-    # display name
-    if display_name:
-        modifications.append('replace: displayName\ndisplayName: ' + display_name)
-    # no password expiration flag handling
+    if mail is not None:
+        if mail != '':
+            modifications.append('replace: mail\nmail: ' + mail)
+        else:
+            modifications.append('delete: mail')
+    if display_name is not None:
+        if display_name != '':
+            modifications.append('replace: displayName\ndisplayName: ' + display_name)
+        else:
+            modifications.append('delete: displayName')
     if no_pwd_exp is not None and uac_line:
         current_uac = int(uac_line.split(':', 1)[1].strip())
         UF_DONT_EXPIRE_PASSWORD = 0x10000
@@ -105,8 +145,8 @@ if ldb_entries:
     ldb_input = '\n'.join(ldb_entries)
     subprocess.run(ldbmodify_cmd, input=ldb_input, stdout=sys.stderr, check=True, text=True)
 
-# 4. Lock users if requested (samba-tool user disable per locked user)
-for item in request:
-    if item.get('locked') is True:
-        lock_cmd = sambatool_cmd + ['user', 'disable', item['user']]
+# 5. Lock users if requested (creation or update). Skip existing when skip_existing True
+for rec in records:
+    if rec.get('locked') is True and not (skip_existing and rec['user'] in existing_users):
+        lock_cmd = sambatool_cmd + ['user', 'disable', rec['user']]
         subprocess.run(lock_cmd, stdout=sys.stderr, check=True, text=True)
