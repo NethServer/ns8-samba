@@ -29,14 +29,19 @@ sambatool_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool']
 skip_existing = request.get('skip_existing', False)
 records = request.get('records', [])
 
-# Track which users exist already (avoid double queries)
+# Fetch existing users and groups with LDAP queries (single ldbsearch for each type)
 existing_users = set()
-for rec in records:
-    user = rec['user']
-    testexists_cmd = sambatool_cmd + ['user', 'show', user]
-    proc = subprocess.run(testexists_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
-    if proc.returncode == 0:
-        existing_users.add(user)
+existing_groups = set()
+ldbsearch_users_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbsearch', '-H', '/var/lib/samba/private/sam.ldb', 'objectClass=user', 'sAMAccountName']
+proc_u = subprocess.run(ldbsearch_users_cmd, capture_output=True, text=True, check=True)
+for line in proc_u.stdout.splitlines():
+    if line.startswith('sAMAccountName:'):
+        existing_users.add(line.split(':',1)[1].strip())
+ldbsearch_groups_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbsearch', '-H', '/var/lib/samba/private/sam.ldb', 'objectClass=group', 'sAMAccountName']
+proc_g = subprocess.run(ldbsearch_groups_cmd, capture_output=True, text=True, check=True)
+for line in proc_g.stdout.splitlines():
+    if line.startswith('sAMAccountName:'):
+        existing_groups.add(line.split(':',1)[1].strip())
 
 # 1. Create users (only missing ones, or all if they don't exist). If skip_existing True, skip creation.
 for rec in records:
@@ -74,7 +79,16 @@ for rec in records:
             setpwd_cmd += ['--must-change-at-next-login']
         subprocess.run(setpwd_cmd, input=inputdata, stdout=sys.stderr, check=True, text=True)
 
-# 3. Collect group memberships additions (we do not remove any existing membership)
+# 3. Ensure requested groups exist and collect memberships (do not remove existing membership)
+# Create missing groups first
+for rec in records:
+    for g in rec.get('groups', []) or []:
+        if g not in existing_groups:
+            # create group
+            create_group_cmd = sambatool_cmd + ['group', 'add', g]
+            subprocess.run(create_group_cmd, stdout=sys.stderr, check=True, text=True)
+            existing_groups.add(g)
+
 add_groups_map = {}
 for rec in records:
     if skip_existing and rec['user'] in existing_users:
