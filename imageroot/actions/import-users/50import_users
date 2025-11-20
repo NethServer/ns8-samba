@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+
+# Copyright (C) 2022 Nethesis S.r.l.
+# http://www.nethesis.it - nethserver@nethesis.it
+#
+# This script is part of NethServer.
+#
+# NethServer is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License,
+# or any later version.
+#
+# NethServer is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with NethServer.  If not, see COPYING.
+
+import json
+import sys
+import subprocess
+import samba
+
+request = json.load(sys.stdin)  # list of user objects
+sambatool_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool']
+
+# 1. Create users (samba-tool only for creation + must-change flag)
+for item in request:
+    user = item['user']
+    password = item.get('password', '')
+    must_change = item.get('must_change_password') is True
+
+    adduser_cmd = sambatool_cmd + ['user', 'create', user]
+    if must_change:
+        adduser_cmd += ['--must-change-at-next-login']
+
+    if not password:
+        adduser_cmd += ['--random-password']
+        inputdata = None
+    else:
+        inputdata = password + "\n" + password + "\n"
+
+    subprocess.run(adduser_cmd, input=inputdata, stdout=sys.stderr, check=True, text=True)
+
+# 2. Collect group memberships to batch addmembers calls
+#    {group: [user1, user2, ...]}
+add_groups_map = {}
+for item in request:
+    for g in item.get('groups', []) or []:
+        add_groups_map.setdefault(g, []).append(item['user'])
+
+for group, members in add_groups_map.items():
+    # samba-tool group addmembers group user1 user2 ...
+    cmd = sambatool_cmd + ['group', 'addmembers', group] + members
+    subprocess.run(cmd, stdout=sys.stderr, check=True, text=True)
+
+# 3. Collect DN and prepare single ldbmodify for mail/displayName/userAccountControl changes
+ldb_entries = []
+for item in request:
+    user = item['user']
+    mail = item.get('mail', '')
+    display_name = item.get('display_name', '')
+    no_pwd_exp = item.get('no_password_expiration')
+
+    # Retrieve DN and (optionally) userAccountControl
+    getdn_cmd = sambatool_cmd + ['user', 'show', user, '--attributes=dn,userAccountControl']
+    proc = subprocess.run(getdn_cmd, check=True, capture_output=True, text=True)
+    dn_line = None
+    uac_line = None
+    for line in proc.stdout.strip().splitlines():
+        if line.startswith('dn:'):
+            dn_line = line
+        elif line.startswith('userAccountControl:'):
+            uac_line = line
+    if not dn_line:
+        continue  # skip if DN not found (should not happen)
+
+    modifications = []
+    # mail
+    if mail:
+        modifications.append('replace: mail\nmail: ' + mail)
+    # display name
+    if display_name:
+        modifications.append('replace: displayName\ndisplayName: ' + display_name)
+    # no password expiration flag handling
+    if no_pwd_exp is not None and uac_line:
+        current_uac = int(uac_line.split(':', 1)[1].strip())
+        UF_DONT_EXPIRE_PASSWORD = 0x10000
+        new_uac = current_uac
+        if no_pwd_exp is True and not (current_uac & UF_DONT_EXPIRE_PASSWORD):
+            new_uac |= UF_DONT_EXPIRE_PASSWORD
+        elif no_pwd_exp is False and (current_uac & UF_DONT_EXPIRE_PASSWORD):
+            new_uac &= ~UF_DONT_EXPIRE_PASSWORD
+        if new_uac != current_uac:
+            modifications.append('replace: userAccountControl\nuserAccountControl: ' + str(new_uac))
+
+    if modifications:
+        entry = dn_line + '\nchangetype: modify\n' + '\n'.join(modifications) + '\n'
+        ldb_entries.append(entry)
+
+if ldb_entries:
+    ldbmodify_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-H', '/var/lib/samba/private/sam.ldb']
+    ldb_input = '\n'.join(ldb_entries)
+    subprocess.run(ldbmodify_cmd, input=ldb_input, stdout=sys.stderr, check=True, text=True)
+
+# 4. Lock users if requested (samba-tool user disable per locked user)
+for item in request:
+    if item.get('locked') is True:
+        lock_cmd = sambatool_cmd + ['user', 'disable', item['user']]
+        subprocess.run(lock_cmd, stdout=sys.stderr, check=True, text=True)
