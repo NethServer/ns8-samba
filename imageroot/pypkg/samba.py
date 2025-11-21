@@ -274,3 +274,198 @@ def set_user_account_control(dn_str, user_account_control, no_password_expiratio
         ldbmodify_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-H', '/var/lib/samba/private/sam.ldb']
         ldbmodify_input = f'{dn_str}\nchangetype: modify\nreplace: userAccountControl\nuserAccountControl: {user_account_control}\n'
         subprocess.run(ldbmodify_cmd, input=ldbmodify_input, stdout=sys.stderr, check=True, text=True)
+
+def get_ad_ldap_suffix() -> str:
+    parts = os.environ["DOMAIN"].split(".")
+    return "DC=" + ",DC=".join(parts)
+
+def import_users(records: list, skip_existing: bool):
+    LDAPSUFFIX = get_ad_ldap_suffix()
+    ACTYPE = 0; ACID = 1; ACMEMBERS = 2; ACUAC = 3
+    merge_existing = not skip_existing
+    adb = _get_accounts()
+
+    all_users = set() # imported user names (AD may have more..)
+    mod_groups = dict() # new group membership mapping
+    new_groups = set() # names of new groups
+
+    # Accumulate LDIF changes
+    ldif_changes = dict() # DB of LDIF changes, key is DN
+    def ldif_prepare(user, att, val, op='replace'):
+        dn = adb[user.lower()][ACID]
+        ldif_changes.setdefault(dn, [])
+        ldif_changes[dn].append((att, val, op))
+
+    for rec in records:
+        user = rec['user']
+        all_users.add(user)
+        pwd = rec.get('password', '')
+        display_name = rec.get('display_name', user.title())
+        must_change = rec.get('must_change_password') is True
+        mail_address = rec.get('mail')
+
+        # Accumulate changes for userAccountControl attribute (UAC)
+        uac_set_flags = 0
+        uac_clear_flags = 0
+        if rec.get('locked') is True:
+            uac_set_flags |= 0x2 # ACCOUNTDISABLED
+        elif rec.get('locked') is False:
+            uac_clear_flags |= 0x2 # ACCOUNTDISABLED
+        if rec.get('no_password_expiration') is True:
+            uac_set_flags |= 0x10000 # DONT_EXPIRE_PASSWD
+        elif rec.get('no_password_expiration') is False:
+            uac_clear_flags |= 0x10000 # DONT_EXPIRE_PASSWD
+
+        # 1. Handle user creation and password reset with samba-tool
+        if user.lower() in adb:
+            if pwd and merge_existing:
+                _reset_password(user, pwd)
+            elif skip_existing:
+                continue # next record
+        else:
+            _create_user(user, pwd)
+            udn = f'CN={user},CN=Users,' + LDAPSUFFIX # Assuming default DN
+            adb[user.lower()] = ('U', udn, [], 512)
+            adb[udn.lower()] = ('U', user, [], 512)
+        # 2. Prepare group sync information
+        for gna in rec.get('groups', []) or []:
+            if gna.lower() in adb:
+                if gna.lower() in new_groups:
+                    # gna must be created, annotate member:
+                    gdn = adb[gna.lower()][ACID]
+                    adb[gna.lower()][ACMEMBERS].append(user)
+                    adb[gdn.lower()][ACMEMBERS].append(user)
+                else:
+                    # gna must be modified:
+                    mod_groups.setdefault(gna, [])
+                    mod_groups[gna].append(user)
+            else:
+                # gna must be created, initialize it:
+                if _create_group(gna):
+                    new_groups.add(gna.lower())
+                    gdn = f'CN={gna},CN=Users,' + LDAPSUFFIX # Assuming default DN
+                    adb[gna.lower()] = ('G', gdn, [user], 0)
+                    adb[gdn.lower()] = ('G', gna, [user], 0)
+
+        # Prepare LDIF changes
+        ldif_prepare(user, 'displayName', display_name)
+        ldif_prepare(user, 'mail', mail_address)
+        if must_change:
+            ldif_prepare(user, 'pwdLastSet', 0)
+        uac = adb[user.lower()][ACUAC]
+        ldif_prepare(user, 'userAccountControl', (uac | uac_set_flags) & ~uac_clear_flags)
+
+    # 3. Add members to new groups:
+    for newg in new_groups:
+        _group_addmembers(newg, adb[newg][ACMEMBERS])
+    # 4. Change members of existing groups:
+    all_users_dn = { adb[u.lower()][ACID].lower() for u in all_users }
+    for gna in mod_groups:
+        new_members_dn = { adb[u.lower()][ACID].lower() for u in mod_groups[gna] }
+        old_members_dn = { adb[u.lower()][ACID].lower() for u in adb[gna.lower()][ACMEMBERS] } & all_users_dn
+        addparams = [ '--member-dn=' + gdn for gdn in new_members_dn - old_members_dn ]
+        if addparams:
+            _group_addmembers(gna, addparams)
+        remparams = [ '--member-dn=' + gdn for gdn in old_members_dn - new_members_dn ]
+        if remparams:
+            _group_removemembers(gna, remparams)
+
+    # 5. Apply LDIF changes:
+    ldbmodify_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-v', '-H', '/var/lib/samba/private/sam.ldb']
+    proc = subprocess.Popen(ldbmodify_cmd, stdin=subprocess.PIPE, stdout=sys.stderr, text=True)
+    for dn in ldif_changes.keys():
+        if proc.stdin.closed:
+            # Resume after error:
+            proc = subprocess.Popen(ldbmodify_cmd, stdin=subprocess.PIPE, stdout=sys.stderr, text=True)
+        changes = ldif_changes[dn]
+        proc.stdin.write('dn: ' + dn + '\n')
+        proc.stdin.write('changetype: modify' + '\n')
+        for cht in changes:
+            proc.stdin.write('-' + '\n')
+            if cht[2] == 'replace':
+                proc.stdin.write('replace: ' + cht[0] + '\n')
+                proc.stdin.write(cht[0] + ': ' + str(cht[1]) + '\n')
+        proc.stdin.write('\n')
+
+def _group_addmembers(group, members):
+    addmembers_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool', 'group', 'addmembers', group, *members]
+    print(*addmembers_cmd, file=sys.stderr)
+    proc = subprocess.run(addmembers_cmd, stdout=sys.stderr, text=True)
+    return proc.returncode == 0
+
+def _group_removemembers(group, members):
+    removemembers_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool', 'group', 'removemembers', group, *members]
+    print(*removemembers_cmd, file=sys.stderr)
+    proc = subprocess.run(removemembers_cmd, stdout=sys.stderr, text=True)
+    return proc.returncode == 0
+
+def _create_group(group):
+    addgroup_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool', 'group', 'create', group]
+    proc = subprocess.run(addgroup_cmd, stdout=sys.stderr, text=True)
+    return proc.returncode == 0
+
+def _reset_password(user, password) -> bool:
+    adduser_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool', 'user', 'setpassword', user]
+    inputdata = password + "\n" + password + "\n"
+    proc = subprocess.run(adduser_cmd, input=inputdata, stdout=sys.stderr, text=True)
+    return proc.returncode == 0
+
+def _create_user(user, password) -> bool:
+    adduser_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool', 'user', 'create', user]
+    if not password:
+        adduser_cmd += ['--random-password']
+        inputdata = None
+    else:
+        inputdata = password + "\n" + password + "\n"
+    proc = subprocess.run(adduser_cmd, input=inputdata, stdout=sys.stderr, text=True)
+    return proc.returncode == 0
+
+def _get_accounts() -> dict:
+    """Returns account information indexed by DN and sAMAccountName. Each value is a tuple with:
+    - Account type ("U" or "G"),
+    - Account DN or name. If one is used as key, the other is set as second element of the triplet.
+    - Array of member DNs, if type is G.
+    - userAccountControl flags
+    """
+    v = lambda l: l.split(": ", 1)[1]
+    accounts = dict()
+    with subprocess.Popen([
+            'podman', 'exec', '-i', 'samba-dc', 'ldbsearch',
+            '-H', '/var/lib/samba/private/sam.ldb',
+            '-b', get_ad_ldap_suffix(),
+            '--paged',
+            '(sAMAccountName=*)',
+            'sAMAccountName',
+            'member',
+            'userAccountControl',
+        ], text=True, stdout=subprocess.PIPE) as proc_ldbsearch:
+            curna = None # current record name
+            curdn = None # current record DN
+            curmb = []   # current record members
+            curty = 'U'  # current record type (User or Group)
+            curac = 0    # current record UAC attribute
+            for ldifline in proc_ldbsearch.stdout:
+                ldifline = ldifline.rstrip("\n")
+                if not ldifline:
+                    # End-Of-Record
+                    if curdn and curna:
+                        accounts[curdn.lower()] = (curty, curna, curmb, curac)
+                        accounts[curna.lower()] = (curty, curdn, curmb, curac)
+                    curdn = None
+                    curna = None
+                    curmb = []
+                    curty = 'U'
+                elif ldifline.startswith("dn:"):
+                    curdn = v(ldifline)
+                elif ldifline.startswith("sAMAccountName:"):
+                    curna = v(ldifline)
+                elif ldifline.startswith("member:"):
+                    curmb.append(v(ldifline))
+                elif ldifline.startswith("userAccountControl:"):
+                    try:
+                        curac = int(v(ldifline))
+                    except ValueError:
+                        cuarc = 2 # ACCOUNTDISABLE
+                elif ldifline == 'objectClass: group':
+                    curty = 'G'
+    return accounts
