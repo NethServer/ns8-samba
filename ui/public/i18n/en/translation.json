@@ -2,7 +2,7 @@
     "common": {
         "required": "Required",
         "work_in_progress": "Work in progress",
-        "processing": "Processing...",
+        "processing": "Processing…",
         "save": "Save",
         "close": "Close",
         "cancel": "Cancel",
@@ -135,7 +135,6 @@
         "invalid_credentials_description": "Authentication failed. Credentials for a user in the 'Domain Admins' group are required.",
         "netbios_domain_name": "NetBIOS domain name",
         "not_set": "(not set)"
-
     },
     "welcome": {
         "title": "Welcome to Samba",
