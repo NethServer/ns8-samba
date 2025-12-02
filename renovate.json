@@ -1,8 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "local>NethServer/.github:ns8-automerge",
-    "docker:pinDigests"
+    "local>NethServer/.github:ns8-automerge"
   ],
   "customManagers": [
     {
