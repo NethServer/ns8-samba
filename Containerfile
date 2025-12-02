@@ -1,5 +1,5 @@
 # Stage 1: Base Ubuntu + Samba image
-FROM docker.io/library/ubuntu:noble-20251013 AS ubuntu-samba-base
+FROM docker.io/library/ubuntu:noble AS ubuntu-samba-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
