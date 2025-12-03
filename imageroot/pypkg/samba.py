@@ -28,6 +28,17 @@ import agent
 import os
 import cluster.userdomains
 
+# Map of array indexes returned by _make_record():
+ACDN = 0
+ACMEMBERS = 1
+ACUAC = 2
+ACID = 3
+ACGROUPS = 4
+ACTYPE = 5
+ACDISPLAY = 6
+ACMAIL = 7
+ACPWDLASTSET = 8
+
 class SambaException(Exception):
     pass
 
@@ -274,3 +285,355 @@ def set_user_account_control(dn_str, user_account_control, no_password_expiratio
         ldbmodify_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-H', '/var/lib/samba/private/sam.ldb']
         ldbmodify_input = f'{dn_str}\nchangetype: modify\nreplace: userAccountControl\nuserAccountControl: {user_account_control}\n'
         subprocess.run(ldbmodify_cmd, input=ldbmodify_input, stdout=sys.stderr, check=True, text=True)
+
+def get_ad_ldap_suffix() -> str:
+    """Returns the LDAP base DN suffix derived from the DOMAIN environment variable.
+    For example, if DOMAIN is 'ad.example.com', returns 'DC=ad,DC=example,DC=com'.
+    """
+    parts = os.environ["DOMAIN"].split(".")
+    return "DC=" + ",DC=".join(parts)
+
+def export_users() -> list:
+    """
+    Exports all non-system user accounts from Active Directory.
+    Returns:
+        list: A list of dictionaries, each containing user information including:
+            - user: The username.
+            - display_name: The user's display name.
+            - locked: Whether the account is locked.
+            - must_change_password: Whether the user must change their password.
+            - no_password_expiration: Whether the password does not expire.
+            - mail (optional): The user's email address, if available.
+            - groups: A sorted list of group names the user belongs to.
+    Notes:
+        System accounts (krbtgt, administrator, guest, ldapservice) and
+        machine accounts (ending with '$') are excluded.
+    """
+    adb = _get_accounts()
+    records = []
+    for rk, rec in adb.items():
+        if rec[ACTYPE] != 'U':
+            continue
+        if rec[ACID].lower() != rk:
+            continue
+        if rec[ACID].lower() in ['krbtgt', 'administrator', 'guest', 'ldapservice']:
+            continue
+        if rec[ACID].endswith('$'):
+            continue
+        out = {
+            "user": rec[ACID],
+            "display_name": rec[ACDISPLAY] or "",
+            "locked": bool(rec[ACUAC] & 0x2), # ACCOUNTDISABLED
+            "must_change_password": rec[ACPWDLASTSET] is None or rec[ACPWDLASTSET] <= 0,
+            "no_password_expiration": bool(rec[ACUAC] & 0x10000), # DONT_EXPIRE_PASSWD
+        }
+        if rec[ACMAIL]:
+            out["mail"] = rec[ACMAIL]
+        groups = []
+        # rec[ACGROUPS] contains group DNs (Distinguished Names).
+        # The adb dictionary is keyed by both group DNs and canonical names,
+        # so we can look up the group name (ACID) using the DN as the key.
+        for g in rec[ACGROUPS]:
+            if g in adb:
+                groups.append(adb[g][ACID])
+        out["groups"] = sorted(groups)
+        records.append(out)
+    return records
+
+def import_users(records: list, skip_existing: bool, progfunc: callable) -> bool:
+    """
+    Imports user accounts and group memberships into Active Directory.
+    Args:
+        records: List of user dictionaries with fields:
+            - user: Username (required)
+            - password: User password (optional)
+            - display_name: Display name (optional)
+            - locked: Account lock status (optional)
+            - groups: List of group names (optional)
+            - mail: Email address (optional)
+            - must_change_password: Require password change at next login (optional)
+            - no_password_expiration: Disable password expiration (optional)
+        skip_existing: If True, skip existing users entirely; if False, update them.
+        progfunc: Callback function for progress updates, takes int 0-100.
+    Returns:
+        True if all operations succeeded, False if any errors occurred.
+    Note:
+        Non-existing groups are created automatically during import.
+    """
+    import_errors = 0
+    LDAPSUFFIX = get_ad_ldap_suffix()
+    merge_existing = not skip_existing
+    adb = _get_accounts()
+    cur_progress = 5.0 # for _get_accounts()
+    progfunc(int(cur_progress))
+
+    prog_step = 75.0/(len(records) or 1) # step_recalc
+
+    all_users = set() # imported user names (AD may have more..)
+    mod_groups = CaseInsensitiveDict() # new group membership mapping
+
+    # Accumulate LDIF changes
+    ldif_changes = CaseInsensitiveDict() # DB of LDIF changes, key is DN
+    def ldif_prepare(user, att, val, op='replace'):
+        dn = adb[user][ACDN]
+        if not dn in ldif_changes:
+            ldif_changes[dn] = [(att, val, op)]
+        else:
+            ldif_changes[dn].append((att, val, op))
+
+    for rec in records:
+        user = rec['user']
+        all_users.add(user)
+        pwd = rec.get('password', '')
+        display_name = rec.get('display_name', user.title())
+        must_change = rec.get('must_change_password') is True
+        mail_address = rec.get('mail')
+
+        # Accumulate changes for userAccountControl attribute (UAC)
+        uac_set_flags = 0
+        uac_clear_flags = 0
+        if rec.get('locked') is True:
+            uac_set_flags |= 0x2 # ACCOUNTDISABLED
+        elif rec.get('locked') is False:
+            uac_clear_flags |= 0x2 # ACCOUNTDISABLED
+        if rec.get('no_password_expiration') is True:
+            uac_set_flags |= 0x10000 # DONT_EXPIRE_PASSWD
+        elif rec.get('no_password_expiration') is False:
+            uac_clear_flags |= 0x10000 # DONT_EXPIRE_PASSWD
+
+        # 1. Handle user creation and password reset with samba-tool
+        if user in adb:
+            udn = adb[user][ACDN]
+            if pwd and merge_existing:
+                cmd_success = _reset_password(user, pwd)
+                if not cmd_success:
+                    import_errors += 1
+            elif skip_existing:
+                cur_progress += 2*prog_step # progress score of skipped commands
+                progfunc(int(cur_progress))
+                continue # next record ; all further processing (group sync, LDIF changes) is skipped for this user
+        else:
+            cmd_success = _create_user(user, pwd)
+            if not cmd_success:
+                import_errors += 1
+                continue # Skip further processing for this user
+            udn = f'CN={user},CN=Users,' + LDAPSUFFIX # Assuming default DN
+            adb[user] = (udn, [], 512, user, [], 'U', None, None, None) # (512 = NORMAL_ACCOUNT)
+
+        # 2a. Add user to its new groups. Non-existing group is created on
+        #     the fly.
+        for gna in rec.get('groups', []):
+            if gna not in adb:
+                # gna must be created, initialize it:
+                if _create_group(gna):
+                    adb[gna] = (f'CN={gna},CN=Users,' + LDAPSUFFIX, [], 0, gna, [], 'G', None, None, None)
+                else:
+                    import_errors += 1
+            if gna in mod_groups:
+                mod_groups[gna].append(udn)
+            else:
+                mod_groups[gna] = [udn]
+        # 2b. Remove user from groups
+        groups = [g.lower() for g in rec.get('groups', [])]
+        for gna in adb:
+            if adb[gna][ACTYPE] == 'G' and \
+                adb[gna][ACDN].lower() != gna.lower() and \
+                not gna.lower() in groups and \
+                udn in adb[gna][ACMEMBERS]:
+                # Found a member that must be removed.
+                if not gna in mod_groups:
+                    # Initialize with current member list, without udn.
+                    mod_groups[gna] = adb[gna][ACMEMBERS].copy()
+                    mod_groups[gna].remove(udn)
+                else:
+                    # List already initialized. Just remove udn from it.
+                    if udn in mod_groups[gna]:
+                        mod_groups[gna].remove(udn)
+
+        # 3. Prepare user LDIF changes
+        ldif_prepare(user, 'displayName', display_name)
+        if mail_address == "":
+            ldif_prepare(user, 'mail', None, "delete")
+        elif mail_address:
+            ldif_prepare(user, 'mail', mail_address)
+        if must_change:
+            ldif_prepare(user, 'pwdLastSet', 0)
+        uac = adb[user][ACUAC]
+        ldif_prepare(user, 'userAccountControl', (uac | uac_set_flags) & ~uac_clear_flags)
+
+        # Update progress
+        cur_progress += prog_step
+        progfunc(int(cur_progress))
+
+    # 4. Prepare group LDIF changes
+    all_users_dn = { adb[u][ACDN] for u in all_users }
+    for gna in mod_groups:
+        keep_members = set(adb[gna][ACMEMBERS]) - all_users_dn
+        new_members = set(mod_groups[gna])
+        member_list = list(new_members | keep_members)
+        if member_list:
+            ldif_prepare(gna, 'member', member_list)
+        else:
+            ldif_prepare(gna, 'member', None, 'delete')
+
+    # 5. Apply LDIF changes:
+    prog_step = 20.0 / (len(ldif_changes) or 1) # step recalc
+    # Since ldbmodify command does not provide a "continue on error"
+    # behavior we split LDIF entries into individual ldbmodify runs: one
+    # entry, one run. Entries are delimited with NUL chars in both input
+    # and output.
+    def read_until_nul(binf):
+        while True:
+            b = binf.read(128)
+            if not b:
+                break # EOF
+            print(b.decode('utf-8', errors="replace"), file=sys.stderr)
+            if b'\0' in b:
+                break # End of record
+    ldbmodifycmd = r"""while read -r -d $'\0' entry ; do ldbmodify -v -H /var/lib/samba/private/sam.ldb <<<"$entry" || { echo -e "Failed LDIF record:\n$entry\n " ; code=1 ; } ; printf "\0" ; done ; exit $code"""
+    with subprocess.Popen(
+        ['podman', 'exec', '-i', 'samba-dc', 'bash', '-c', ldbmodifycmd],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=False, # binary stream required for b'\0' terminators
+        bufsize=0,
+    ) as proc:
+        for dn in ldif_changes.keys():
+            oentry = ''
+            oentry += f'dn: {dn}\n'
+            oentry += f'changetype: modify\n'
+            for cht in ldif_changes[dn]:
+                if cht[2] == 'replace' or cht[2] == 'add':
+                    oentry += f'{cht[2]}: {cht[0]}\n'
+                    if isinstance(cht[1], list):
+                        for v in cht[1]:
+                            oentry += f'{cht[0]}: {v}\n'
+                    else:
+                        oentry += f'{cht[0]}: {cht[1]}\n'
+                elif cht[2] == 'delete':
+                    oentry += f'delete: {cht[0]}\n'
+                oentry += '-\n'
+            proc.stdin.write(oentry.encode('utf-8', errors='replace') + b'\0')
+            read_until_nul(proc.stdout)
+            cur_progress += prog_step
+            progfunc(int(cur_progress))
+    progfunc(100) # Complete progress scores
+    if proc.returncode:
+        import_errors += 1
+    return import_errors == 0
+
+def _create_group(group):
+    addgroup_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool', 'group', 'create', group]
+    proc = subprocess.run(addgroup_cmd, stdout=sys.stderr, text=True)
+    return proc.returncode == 0
+
+def _reset_password(user, password) -> bool:
+    adduser_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool', 'user', 'setpassword', user]
+    inputdata = password + "\n" + password + "\n"
+    proc = subprocess.run(adduser_cmd, input=inputdata, stdout=sys.stderr, text=True)
+    return proc.returncode == 0
+
+def _create_user(user, password) -> bool:
+    adduser_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool', 'user', 'create', user]
+    if not password:
+        adduser_cmd += ['--random-password']
+        inputdata = None
+    else:
+        inputdata = password + "\n" + password + "\n"
+    proc = subprocess.run(adduser_cmd, input=inputdata, stdout=sys.stderr, text=True)
+    return proc.returncode == 0
+
+class CaseInsensitiveDict(dict):
+    """Dict subclass with case-insensitive key lookup.
+
+    Limitations:
+    - Only string keys are supported; non-string keys will fail on .lower().
+    - Methods other than __setitem__, __getitem__, and __contains__
+      remain case-sensitive (get, pop, setdefault, update, etc.).
+    - Iteration yields lower-cased keys since stored keys are normalized.
+    - Keys that differ only by case are merged silently.
+    """
+    def __setitem__(self, key, value):
+        super().__setitem__(key.lower(), value)
+
+    def __getitem__(self, key):
+        return super().__getitem__(key.lower())
+
+    def __contains__(self, key):
+        return super().__contains__(key.lower())
+
+def _get_accounts() -> dict:
+    """Returns account information indexed by DN and sAMAccountName. Each
+    value is a tuple of 9 elements.
+    """
+    v = lambda l: l.split(": ", 1)[1]
+
+    def _make_record():
+        record = list((None,)*9)
+        record[ACGROUPS] = []
+        record[ACMEMBERS] = []
+        record[ACTYPE] = 'U'
+        record[ACUAC] = 0
+        return record
+
+    accounts = CaseInsensitiveDict()
+    with subprocess.Popen([
+            'podman', 'exec', '-i', 'samba-dc', 'ldbsearch',
+            '-H', '/var/lib/samba/private/sam.ldb',
+            '-b', get_ad_ldap_suffix(),
+            '--paged',
+            '(sAMAccountName=*)',
+            'sAMAccountName',
+            'member',
+            'userAccountControl',
+            'memberOf',
+            'objectClass',
+            'pwdLastSet',
+            'mail',
+            'displayName',
+        ], text=True, stdout=subprocess.PIPE) as proc_ldbsearch:
+            record = _make_record()
+            curdn = None
+            curna = None
+            for ldifline in proc_ldbsearch.stdout:
+                ldifline = ldifline.rstrip("\n")
+                if not ldifline:
+                    # End-Of-Record
+                    if curna and curdn:
+                        accounts[curna] = record
+                        accounts[curdn] = record
+                    record = _make_record()
+                    curdn = None
+                    curna = None
+                elif ldifline.startswith("dn:"):
+                    curdn = v(ldifline)
+                    record[ACDN] = curdn
+                elif ldifline.startswith("sAMAccountName:"):
+                    curna = v(ldifline)
+                    record[ACID] = curna
+                elif ldifline.startswith("member:"):
+                    record[ACMEMBERS].append(v(ldifline))
+                elif ldifline.startswith("memberOf:"):
+                    record[ACGROUPS].append(v(ldifline))
+                elif ldifline == "objectClass: group":
+                    record[ACTYPE] = 'G'
+                elif ldifline.startswith("userAccountControl:"):
+                    try:
+                        record[ACUAC] = int(v(ldifline))
+                    except ValueError:
+                        # Force to disabled state:
+                        record[ACUAC] = 2 # ACCOUNTDISABLE
+                elif ldifline.startswith("displayName:"):
+                    record[ACDISPLAY] = v(ldifline)
+                elif ldifline.startswith("mail:"):
+                    record[ACMAIL] = v(ldifline)
+                elif ldifline.startswith("pwdLastSet:"):
+                    try:
+                        record[ACPWDLASTSET] = int(v(ldifline))
+                    except ValueError:
+                        # Ignore invalid pwdLastSet values; leave as None
+                        pass
+    if proc_ldbsearch.returncode != 0:
+        print("[ERROR] ldbsearch failed!", file=sys.stderr)
+        return CaseInsensitiveDict()
+    return accounts

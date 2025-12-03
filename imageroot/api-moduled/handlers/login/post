@@ -11,46 +11,97 @@ import os
 import agent
 import subprocess
 import hashlib
+import requests
 
 from agent.ldapproxy import Ldapproxy
 from agent.ldapclient import Ldapclient
 
-request = json.load(sys.stdin)
-
-odomain = Ldapproxy().get_domain(os.environ["REALM"].lower())
-
-oldapcli = Ldapclient.factory(**odomain)
-
-try:
-    user_dn = oldapcli.get_user_entry(request['username'])["dn"]
-    ouser = oldapcli.get_user(request['username'])
-except agent.ldapclient.exceptions.LdapclientEntryNotFound:
-    sys.exit(2) # User not found
-
-# Unique and impredictable cache file name:
-cache_file = "/tmp/login_" + hashlib.sha256(("login-" + request['username'] + request['password']).encode()).hexdigest()
-
-proc_kinit = subprocess.run(["podman", "exec", "-e", "KRB5CCNAME=" + cache_file, "-i", "samba-dc",
-    "kinit", request["username"]],
-    input=request["password"], text=True, capture_output=True)
-
-oclaims = {
-    "uid": ouser["user"],
-    "groups": list(ogroup["group"] for ogroup in ouser["groups"]),
-}
-
-if proc_kinit.returncode != 0:
-    if "Password expired.  You must change it now." in proc_kinit.stdout:
-        # Password must be changed immediately: return a token limited to
-        # password changing:
-        oclaims["scope"] = ["change-password", "get-password-policy"]
+def main():
+    request = json.load(sys.stdin)
+    auth_backend = request.get("auth_backend", "ad")
+    if auth_backend == "ad":
+        oclaims = ad_login(request)
+    elif auth_backend == "api-server":
+        oclaims = api_server_login(request)
     else:
-        sys.exit(3) # Login failed
+        sys.exit(2) # Invalid request
+    json.dump(oclaims, fp=sys.stdout)
 
-if "Domain Admins" not in oclaims["groups"]:
-    oclaims["scope"] = ["change-password", "get-password-policy"]
+def ad_login(request):
+    odomain = Ldapproxy().get_domain(os.environ["REALM"].lower())
+    oldapcli = Ldapclient.factory(**odomain)
+    try:
+        ouser = oldapcli.get_user(request['username'])
+    except agent.ldapclient.exceptions.LdapclientEntryNotFound:
+        sys.exit(2) # User not found
+    # Unique and unpredictable cache file name:
+    cache_file = "/tmp/login_" + hashlib.sha256(("login-" + request['username'] + request['password']).encode()).hexdigest()
+    proc_kinit = subprocess.run(["podman", "exec", "-e", "KRB5CCNAME=" + cache_file, "-i", "samba-dc",
+        "kinit", request["username"]],
+        input=request["password"], text=True, capture_output=True)
+    oclaims = {
+        "auth_backend": "ad",
+        "uid": ouser["user"],
+        "groups": list(ogroup["group"] for ogroup in ouser["groups"]),
+    }
+    if proc_kinit.returncode != 0:
+        if "Password expired.  You must change it now." in proc_kinit.stdout:
+            # Password must be changed immediately: return a token limited to
+            # password changing:
+            oclaims["scope"] = ["change-password", "get-password-policy"]
+        else:
+            sys.exit(3) # Login failed
+    if "Domain Admins" not in oclaims["groups"]:
+        oclaims["scope"] = ["change-password", "get-password-policy"]
+    # Clean up the cache file after a successful login:
+    subprocess.run(["podman", "exec", "samba-dc", "rm", "-f", cache_file], text=True, capture_output=True)
+    return oclaims
 
-# Clean up the cache file after a successful login:
-subprocess.run(["podman", "exec", "samba-dc", "rm", "-f", cache_file], text=True, capture_output=True)
+def api_server_login(request):
+    """Grant an equivalent of domadm role access on api-moduled handlers,
+    if provided cluster-admin credentials are authorized to run
+    import-users action."""
+    auth = (request["username"], request["password"])
+    module_id = os.environ["MODULE_ID"]
+    try:
+        response = requests.get(f'http://cluster-leader:9311/api/module/{module_id}/http-basic/import-users', auth=auth, timeout=10)
+        if response.status_code == 200:
+            # Check the response format sanity
+            if not "X-Auth-User" in response.headers:
+                raise Exception("Malformed header from upstream server")
+            jresponse = response.json()
+            if jresponse["code"] != 200:
+                raise Exception("Unexpected payload from upstream server")
+        else:
+            # Check if response is a JSON object with a message attribute:
+            response.json()["message"]
+    except requests.RequestException as e:
+        print(f"login: network error: {e}", file=sys.stderr)
+        sys.exit(2)
+    except (KeyError, ValueError, json.JSONDecodeError) as e:
+        print(f"login: unexpected cluster-admin response: {e}", file=sys.stderr)
+        sys.exit(2)
+    except Exception as ex:
+        print(f"login: failed response check: {e}", file=sys.stderr)
+        sys.exit(2)
+    oclaims = {
+        "auth_backend": "api-server",
+        "uid": request["username"],
+        "groups": [],
+        "scope": [
+            "add-user",
+            "add-group",
+            "alter-user",
+            "alter-group",
+            "remove-user",
+            "remove-group",
+            "export-users",
+            "import-users",
+            "list-users",
+            "list-groups",
+        ],
+    }
+    return oclaims
 
-json.dump(oclaims, fp=sys.stdout)
+if __name__ == "__main__":
+    main()

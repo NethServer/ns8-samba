@@ -8,6 +8,10 @@
         "password"
     ],
     "properties": {
+        "auth_backend": {
+            "enum": ["api-server", "ad"],
+            "default": "ad"
+        },
         "username": {
             "type": "string"
         },
