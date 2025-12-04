@@ -576,6 +576,34 @@ def _get_accounts() -> dict:
         record[ACUAC] = 0
         return record
 
+    def _ldif_unfold(ldif_iter):
+        buf = None     # accumulated logical line (without trailing newline)
+        for raw in ldif_iter:
+            # raw always ends with '\n', except possibly at EOF
+            if raw == "\n":
+                # Blank line: flush current logical line, then yield blank line
+                if buf is not None:
+                    yield buf + "\n"
+                    buf = None
+                yield "\n"
+                continue
+
+            if raw.startswith(" "):  # continuation line
+                if buf is None:
+                    # malformed LDIF: treat as new line without leading space
+                    buf = raw.lstrip().rstrip("\n")
+                else:
+                    buf += raw[1:].rstrip("\n")
+            else:
+                # New logical line
+                if buf is not None:
+                    yield buf + "\n"
+                buf = raw.rstrip("\n")
+
+        # EOF: flush last buffered logical line (without adding extra blank line)
+        if buf is not None:
+            yield buf + "\n"
+
     accounts = CaseInsensitiveDict()
     with subprocess.Popen([
             'podman', 'exec', '-i', 'samba-dc', 'ldbsearch',
@@ -595,7 +623,7 @@ def _get_accounts() -> dict:
             record = _make_record()
             curdn = None
             curna = None
-            for ldifline in proc_ldbsearch.stdout:
+            for ldifline in _ldif_unfold(proc_ldbsearch.stdout):
                 ldifline = ldifline.rstrip("\n")
                 if not ldifline:
                     # End-Of-Record
