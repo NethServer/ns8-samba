@@ -317,7 +317,7 @@ def export_users() -> list:
             continue
         if rec[ACID].lower() != rk:
             continue
-        if rec[ACID].lower() in ['krbtgt', 'administrator', 'guest', 'ldapservice']:
+        if rec[ACID].lower() in ['krbtgt', 'guest', 'ldapservice']:
             continue
         if rec[ACID].endswith('$'):
             continue
