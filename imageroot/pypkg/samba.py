@@ -27,6 +27,7 @@ import sys
 import agent
 import os
 import cluster.userdomains
+import base64
 
 # Map of array indexes returned by _make_record():
 ACDN = 0
@@ -566,7 +567,14 @@ def _get_accounts() -> dict:
     """Returns account information indexed by DN and sAMAccountName. Each
     value is a tuple of 9 elements.
     """
-    v = lambda l: l.split(": ", 1)[1]
+    def v(line):
+        a, w = line.split(": ", 1)
+        if a.endswith(":"):
+            try:
+                return base64.b64decode(w).decode("utf-8", errors="ignore")
+            except Exception:
+                pass
+        return w
 
     def _make_record():
         record = list((None,)*9)
