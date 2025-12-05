@@ -323,13 +323,14 @@ def export_users() -> list:
             continue
         out = {
             "user": rec[ACID],
-            "display_name": rec[ACDISPLAY] or "",
             "locked": bool(rec[ACUAC] & 0x2), # ACCOUNTDISABLED
             "must_change_password": rec[ACPWDLASTSET] is None or rec[ACPWDLASTSET] <= 0,
             "no_password_expiration": bool(rec[ACUAC] & 0x10000), # DONT_EXPIRE_PASSWD
         }
         if rec[ACMAIL]:
             out["mail"] = rec[ACMAIL]
+        if rec[ACDISPLAY]:
+            out["display_name"] = rec[ACDISPLAY]
         groups = []
         # rec[ACGROUPS] contains group DNs (Distinguished Names).
         # The adb dictionary is keyed by both group DNs and canonical names,
@@ -386,7 +387,7 @@ def import_users(records: list, skip_existing: bool, progfunc: callable) -> bool
         user = rec['user']
         all_users.add(user)
         pwd = rec.get('password', '')
-        display_name = rec.get('display_name', user.title())
+        display_name = rec.get('display_name')
         must_change = rec.get('must_change_password') is True
         mail_address = rec.get('mail')
 
@@ -420,6 +421,8 @@ def import_users(records: list, skip_existing: bool, progfunc: callable) -> bool
                 continue # Skip further processing for this user
             udn = f'CN={user},CN=Users,' + LDAPSUFFIX # Assuming default DN
             adb[user] = (udn, [], 512, user, [], 'U', None, None, None) # (512 = NORMAL_ACCOUNT)
+            if not display_name:
+                display_name = user.title() # Initialize displayName with the Title Case of username
 
         # 2a. Add user to its new groups. Non-existing group is created on
         #     the fly.
@@ -452,8 +455,11 @@ def import_users(records: list, skip_existing: bool, progfunc: callable) -> bool
                         mod_groups[gna].remove(udn)
 
         # 3. Prepare user LDIF changes
-        ldif_prepare(user, 'displayName', display_name)
-        if mail_address == "":
+        if display_name == "" and adb[user][ACDISPLAY] is not None:
+            ldif_prepare(user, 'displayName', None, "delete")
+        elif display_name:
+            ldif_prepare(user, 'displayName', display_name)
+        if mail_address == "" and adb[user][ACMAIL] is not None:
             ldif_prepare(user, 'mail', None, "delete")
         elif mail_address:
             ldif_prepare(user, 'mail', mail_address)
