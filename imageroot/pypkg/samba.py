@@ -291,7 +291,7 @@ def get_ad_ldap_suffix() -> str:
     """Returns the LDAP base DN suffix derived from the DOMAIN environment variable.
     For example, if DOMAIN is 'ad.example.com', returns 'DC=ad,DC=example,DC=com'.
     """
-    parts = os.environ["DOMAIN"].split(".")
+    parts = os.getenv('DOMAIN', os.environ['REALM'].lower()).split(".")
     return "DC=" + ",DC=".join(parts)
 
 def export_users() -> list:
