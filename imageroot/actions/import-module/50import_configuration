@@ -26,3 +26,4 @@ for evar in [
 
 agent.set_env('SERVER_ROLE', 'dc')
 agent.set_env('NBALIAS', '')
+agent.set_env('DOMAIN', ienv['REALM'].lower())
