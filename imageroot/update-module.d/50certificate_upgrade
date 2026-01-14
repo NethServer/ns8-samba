@@ -1,0 +1,18 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+exec 1>&2
+
+if [[ -d tls-certs ]] ; then
+    exit 0
+fi
+
+mkdir -vp tls-certs
+podman cp samba-dc:/var/lib/samba/private/tls/cert.pem tls-certs/
+podman cp samba-dc:/var/lib/samba/private/tls/key.pem tls-certs/
+podman cp samba-dc:/var/lib/samba/private/tls/ca.pem tls-certs/
+systemctl --user start get-certificate.service
