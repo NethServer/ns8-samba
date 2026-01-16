@@ -24,6 +24,6 @@ get_proc = agent.run_helper(
     myname,
 )
 
-# Reload the running service if the certificate differs
+# Restart the running service if the certificate differs
 if get_proc.returncode == 0:
-    agent.run_helper('systemctl', '--user', 'reload', 'samba-dc.service')
+    agent.run_helper('systemctl', '--user', 'restart', 'samba-dc.service')
