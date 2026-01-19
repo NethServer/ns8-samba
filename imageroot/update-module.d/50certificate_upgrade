@@ -12,7 +12,4 @@ if [[ -d tls-certs ]] ; then
 fi
 
 mkdir -vp tls-certs
-podman cp samba-dc:/var/lib/samba/private/tls/cert.pem tls-certs/
-podman cp samba-dc:/var/lib/samba/private/tls/key.pem tls-certs/
-podman cp samba-dc:/var/lib/samba/private/tls/ca.pem tls-certs/
 systemctl --user start get-certificate.service
