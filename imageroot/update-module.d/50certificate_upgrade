@@ -12,4 +12,3 @@ if [[ -d tls-certs ]] ; then
 fi
 
 mkdir -vp tls-certs
-systemctl --user start get-certificate.service
