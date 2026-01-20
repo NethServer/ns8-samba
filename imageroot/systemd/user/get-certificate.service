@@ -9,3 +9,4 @@ WorkingDirectory=%S/state
 SyslogIdentifier=%N
 ExecStart=-mkdir -vp tls-certs
 ExecStart=-runagent get-certificate --cert-file=tls-certs/cert.pem --key-file=tls-certs/key.pem $HOSTNAME
+ExecStart=-bash -c 'cd tls-certs ; touch -r cert.pem ca.pem'

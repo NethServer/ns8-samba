@@ -69,7 +69,6 @@ cat - >/etc/samba/smb.conf <<EOF
         recycle:repository =
         recycle:keeptree = yes
         recycle:versions = yes
-		tls cafile =
 
 EOF
 
