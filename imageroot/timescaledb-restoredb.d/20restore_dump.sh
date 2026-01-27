@@ -15,6 +15,21 @@ CREATE USER samba_audit WITH PASSWORD :'pass';
 GRANT USAGE ON SCHEMA public TO samba_audit;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO samba_audit;
 CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+-- Wait for TimescaleDB catalogs to be ready
+DO $$
+BEGIN
+  LOOP
+    EXIT WHEN EXISTS (
+      SELECT 1
+      FROM pg_class
+      WHERE relname = 'chunk'
+        AND relnamespace = '_timescaledb_catalog'::regnamespace
+    );
+    PERFORM pg_sleep(1.0);
+  END LOOP;
+END$$;
+
 SELECT timescaledb_pre_restore();
 EOSQL
 
