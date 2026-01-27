@@ -74,16 +74,17 @@ def assign_ipaddress_for_dc(original_environment, has_valid_ip):
     rdbw = agent.redis_connect(privileged=True)
     rdbw.sadd(f"module/{module_id}/flags", "core_module", "account_provider")
     rdbw.set(f"module/{module_id}/user_domain", original_environment['REALM'].lower())
+    with agent.redis_connect(use_replica=True) as rdb:
+        cluster_network = ipaddress.ip_network(rdb.get('cluster/network'))
+        vpn_ipaddress = rdb.hget(f"node/{os.environ['NODE_ID']}/vpn", "ip_address")
+    dc_ipaddress = ipaddress.ip_address(original_environment['IPADDRESS'])
     if has_ad_user_domain(original_environment, check_also_external_domains=False):
         agent.unset_env('IPADDRESS') # Manual config
-    elif has_valid_ip:
+    elif has_valid_ip and dc_ipaddress not in cluster_network:
         # Start the DC with original IP address:
         agent.set_env('IPADDRESS', original_environment['IPADDRESS'])
         rdbw.sadd(f"module/{module_id}/flags", "file_server")
     else:
-        with agent.redis_connect(use_replica=True) as rdb:
-            cluster_network = ipaddress.ip_network(rdb.get('cluster/network'))
-            vpn_ipaddress = rdb.hget(f"node/{os.environ['NODE_ID']}/vpn", "ip_address")
         # Use the node VPN IP address to start the DC:
         agent.set_env('PREFIXLEN', str(cluster_network.prefixlen))
         agent.set_env('IPADDRESS', vpn_ipaddress)
