@@ -15,6 +15,20 @@ CREATE USER samba_audit WITH PASSWORD :'pass';
 GRANT USAGE ON SCHEMA public TO samba_audit;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO samba_audit;
 CREATE EXTENSION IF NOT EXISTS timescaledb;
+-- Wait until TimescaleDB catalogs are initialized.
+-- chunk is created early; extra sleep allows background workers to finish.
+DO $$
+DECLARE
+  i integer := 0;
+BEGIN
+  LOOP
+    EXIT WHEN to_regclass('_timescaledb_catalog.chunk') IS NOT NULL;
+    EXIT WHEN i >= 100;
+    PERFORM pg_sleep(0.5);
+    i := i + 1;
+  END LOOP;
+  PERFORM pg_sleep(0.5); -- Extra wait after the catalog appears
+END$$;
 SELECT timescaledb_pre_restore();
 EOSQL
 
