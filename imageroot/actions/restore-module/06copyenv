@@ -75,7 +75,7 @@ def assign_ipaddress_for_dc(original_environment, has_valid_ip):
     rdbw.sadd(f"module/{module_id}/flags", "core_module", "account_provider")
     rdbw.set(f"module/{module_id}/user_domain", original_environment['REALM'].lower())
     with agent.redis_connect(use_replica=True) as rdb:
-        cluster_network = ipaddress.ip_network(rdb.get('cluster/network'))
+        cluster_network = ipaddress.ip_network(rdb.get('cluster/network'), strict=False)
         vpn_ipaddress = rdb.hget(f"node/{os.environ['NODE_ID']}/vpn", "ip_address")
     dc_ipaddress = ipaddress.ip_address(original_environment['IPADDRESS'])
     if has_ad_user_domain(original_environment, check_also_external_domains=False):
