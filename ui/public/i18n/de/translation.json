@@ -2,7 +2,7 @@
     "common": {
         "required": "Erforderlich",
         "work_in_progress": "In Bearbeitung",
-        "processing": "Verarbeitung läuft...",
+        "processing": "verarbeite…",
         "save": "speichern",
         "close": "Schließen",
         "cancel": "abbrechen",
