@@ -23,22 +23,37 @@
 exec 1>&2
 set -e
 
-if [[ -f samba_audit.pgdump ]] ; then
-    echo "Restore samba_audit data in TimescaleDB:"
+if [[ -f samba_audit.csv.gz ]] && ! podman volume exists timescaledb; then
+    # See https://www.tigerdata.com/docs/self-hosted/latest/backup-and-restore/logical-backup#back-up-and-restore-individual-hypertables
+    echo "Restore samba_audit hypertable data in TimescaleDB:"
     write-timescaledb-config # generate timescaledb.env
+    rm -rf timescaledb-initdb.d
+    cp -av ../timescaledb-initdb.d timescaledb-initdb.d
+    mv -v samba_audit.csv.gz timescaledb-initdb.d/
+    echo "COPY samba_audit FROM PROGRAM 'gunzip -c /docker-entrypoint-initdb.d/samba_audit.csv.gz' CSV HEADER;" \
+        > timescaledb-initdb.d/30load_csv.sql
+    {
+        # Temp server shutdown procedure. NOTE: the generated .sh file is
+        # sourced (not executed) by container's entrypoint, to invoke its
+        # own shutdown procedure.
+        echo "psql --version"
+        echo "docker_temp_server_stop"
+        echo "exit 0"
+    } > timescaledb-initdb.d/90stop_temp_server.sh
+    # Run a temporary server without network just to import data. This
+    # offloads the systemd unit from a time consuming operation avoiding
+    # startup timeouts.
     podman run \
-        --rm \
         --log-driver=none \
         --network=none \
-        --interactive \
         --replace --name=timescaledb --rm \
         --env=POSTGRES_DB=samba_audit \
         --env=PGPORT=15432 \
-        --volume=../timescaledb-restoredb.d:/docker-entrypoint-initdb.d:z \
+        --volume=./timescaledb-initdb.d:/docker-entrypoint-initdb.d:z \
         --volume=timescaledb:/var/lib/postgresql/data:z \
         --env-file=timescaledb.env \
-        "${TIMESCALEDB_IMAGE}" < samba_audit.pgdump
-    rm -vf samba_audit.pgdump
+        "${TIMESCALEDB_IMAGE}"
+    rm -rf timescaledb-initdb.d/
 fi
 
 echo "Resume Samba ${SERVER_ROLE^^} state:"

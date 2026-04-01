@@ -46,7 +46,10 @@ EOF
 
 #
 # TimescaleDB backup, see
-# https://docs.timescale.com/self-hosted/latest/backup-and-restore/logical-backup/#back-up-and-restore-an-entire-database
+# https://www.tigerdata.com/docs/self-hosted/latest/backup-and-restore/logical-backup#back-up-and-restore-individual-hypertables
 #
-echo "Dumping samba_audit DB from TimescaleDB to disk:"
-podman exec -u postgres timescaledb pg_dump -p 15432 -d samba_audit -Fc -Z 5 > samba_audit.pgdump
+echo "Dumping TimescaleDB samba_audit hypertable to disk:"
+podman exec -u postgres timescaledb \
+    psql -p 15432 -d samba_audit \
+    -c "COPY (SELECT * FROM samba_audit) TO STDOUT CSV HEADER" | \
+    gzip -v -5 > samba_audit.csv.gz
