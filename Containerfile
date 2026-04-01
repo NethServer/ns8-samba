@@ -3,7 +3,7 @@ FROM docker.io/library/ubuntu:noble AS ubuntu-samba-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# renovate-ubuntu: suite=noble
+# renovate-ubuntu: suite=noble-updates
 RUN set -e \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -16,7 +16,7 @@ RUN set -e \
         bzip2=1.0.8-5.1build0.1 \
         ldb-tools=2:2.8.0+samba4.19.5+dfsg-4ubuntu9.4 \
         chrony=4.5-1ubuntu4.2 \
-        dnsutils=1:9.18.39-0ubuntu0.24.04.2 \
+        bind9-dnsutils=1:9.18.39-0ubuntu0.24.04.3 \
         acl=2.3.2-1build1.1 \
         attr=1:2.5.2-1build1.1 \
         smbclient=2:4.19.5+dfsg-4ubuntu9.4 \
