@@ -46,7 +46,12 @@ EOF
 
 #
 # TimescaleDB backup, see
-# https://docs.timescale.com/self-hosted/latest/backup-and-restore/logical-backup/#back-up-and-restore-an-entire-database
+# https://www.tigerdata.com/docs/self-hosted/latest/backup-and-restore/physical
 #
-echo "Dumping samba_audit DB from TimescaleDB to disk:"
-podman exec -u postgres timescaledb pg_dump -p 15432 -d samba_audit -Fc -Z 5 > samba_audit.pgdump
+echo "Dumping TimescaleDB to disk:"
+podman exec timescaledb rm -rf /srv/tsdb_backup/pgdata
+podman exec timescaledb pg_basebackup --verbose \
+        --username=postgres \
+        --format=tar \
+        --wal-method=stream \
+        --pgdata=/srv/tsdb_backup/pgdata \

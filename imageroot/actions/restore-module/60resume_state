@@ -23,22 +23,25 @@
 exec 1>&2
 set -e
 
-if [[ -f samba_audit.pgdump ]] ; then
-    echo "Restore samba_audit data in TimescaleDB:"
-    write-timescaledb-config # generate timescaledb.env
+if [[ -f timescaledb.env ]] && ! podman volume exists timescaledb; then
+    # TimescaleDB restore, see https://www.tigerdata.com/docs/self-hosted/latest/backup-and-restore/physical
+    echo "Restore TimescaleDB for samba_audit:"
+    # Extract the complete pg_basebackup archive into $PGDATA directory.
+    # From NS8 core backup behavior, we can assume that PostgreSQL
+    # versions of backup/restore are the same.
     podman run \
-        --rm \
         --log-driver=none \
         --network=none \
-        --interactive \
         --replace --name=timescaledb --rm \
-        --env=POSTGRES_DB=samba_audit \
-        --env=PGPORT=15432 \
-        --volume=../timescaledb-restoredb.d:/docker-entrypoint-initdb.d:z \
+        --volume=tsdb_backup:/srv/tsdb_backup:z \
         --volume=timescaledb:/var/lib/postgresql/data:z \
-        --env-file=timescaledb.env \
-        "${TIMESCALEDB_IMAGE}" < samba_audit.pgdump
-    rm -vf samba_audit.pgdump
+        --entrypoint=[] \
+        --interactive \
+        "${TIMESCALEDB_IMAGE}" ash -e -x -c '
+            tar -C /var/lib/postgresql/data -xf /srv/tsdb_backup/pgdata/base.tar
+            tar -C /var/lib/postgresql/data/pg_wal -xf /srv/tsdb_backup/pgdata/pg_wal.tar
+            rm -rfv /srv/tsdb_backup/pgdata
+        '
 fi
 
 echo "Resume Samba ${SERVER_ROLE^^} state:"
