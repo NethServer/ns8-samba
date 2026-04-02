@@ -40,9 +40,9 @@ if [[ -f samba_audit.csv.gz ]] && ! podman volume exists timescaledb; then
         echo "docker_temp_server_stop"
         echo "exit 0"
     } > timescaledb-initdb.d/90stop_temp_server.sh
-    # Run a temporary server without network just to import data. This
-    # offloads the systemd unit from a time consuming operation avoiding
-    # startup timeouts.
+    # Start a temporary server without network access to initialize the DB
+    # and import data. This is a long-running operation and cannot be handled
+    # by the systemd unit without risking timeouts.
     podman run \
         --log-driver=none \
         --network=none \
