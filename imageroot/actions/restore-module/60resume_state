@@ -37,7 +37,7 @@ if [[ -f timescaledb.env ]] && ! podman volume exists timescaledb; then
         --volume=timescaledb:/var/lib/postgresql/data:z \
         --entrypoint=[] \
         --interactive \
-        "${TIMESCALEDB_IMAGE}" ash -e -x -c '
+        "${TIMESCALEDB_IMAGE}" sh -e -x -c '
             tar -C /var/lib/postgresql/data -xf /srv/tsdb_backup/pgdata/base.tar
             tar -C /var/lib/postgresql/data/pg_wal -xf /srv/tsdb_backup/pgdata/pg_wal.tar
             rm -rfv /srv/tsdb_backup/pgdata
