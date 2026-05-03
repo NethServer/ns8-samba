@@ -14,7 +14,7 @@
         "enabled": "Aktiviert"
     },
     "error": {
-        "403": "Vorgang nicht autorisiert",
+        "403": "Vorgang nicht zulässig",
         "401": "Authentifizierung fehlerhaft",
         "cannot_retrieve_module_info": "Fehler beim Abruf der Modul-Info",
         "cannot_retrieve_installed_modules": "Fehler beim Abruf installierter Module",
@@ -34,8 +34,8 @@
         "ipaddress_private_check_failed": "IP-Adresse muss im privaten Bereich sein",
         "ipaddress_bind_check_failed": "IP-Adresse bereits in Verwendung",
         "ipaddress_avail_check_failed": "IP-Adresse nicht verfügbar",
-        "nbalias_pattern": "Only alphanumeric characters and hyphens are allowed",
-        "nbalias_conflict": "File server alias already in use",
+        "nbalias_pattern": "Nur alphanumerische Zeichen und Bindestriche zulässig",
+        "nbalias_conflict": "Der Dateiserver-Alias wird bereits verwendet",
         "must_be_a_number": "Muss eine Zahl sein",
         "must_be_an_integer": "Muss eine Ganzzahl sein",
         "must_be_greater_than_zero": "Muss größer 0 sein",
@@ -66,10 +66,10 @@
         "title": "Über"
     },
     "action": {
-        "list-backup-repositories": "Backup-Speicherorte auflisten",
+        "list-backup-repositories": "Sicherungs-Ziele auflisten",
         "get-module-info": "Modul-Info abrufen",
         "list-installed-modules": "Installierte Module auflisten",
-        "list-backups": "Backups auflisten",
+        "list-backups": "Datensicherungen auflisten",
         "get-status": "Status abrufen",
         "configure-module": "Modul konfigurieren",
         "get-configuration": "Konfiguration abrufen",
@@ -81,8 +81,8 @@
         "add-share": "erstelle freigegebenen Ordner",
         "reset-share-acls": "Berechtigungen der Ordnerfreigabe festlegen",
         "restore-backup-content": "Datei oder Ordner wiederherstellen",
-        "read-backup-snapshots": "Read backup snapshots",
-        "seek-snapshot-contents": "Search matching files",
+        "read-backup-snapshots": "Sicherungs-Snapshots einlesen",
+        "seek-snapshot-contents": "passenden Dateien suchen",
         "list-user-domains": "Liste von Benutzerkonten",
         "set-configuration": "Konfiguration setzen"
     },
@@ -129,7 +129,7 @@
         "from_node_name": "Von Knoten {name}",
         "most_recent": "Aktuellste",
         "select_backup_snapshot": "Sicherungs-Snapshot wählen",
-        "select_file_or_folder_to_restore": "Select file or folder to restore",
+        "select_file_or_folder_to_restore": "Datei oder Ordner zum wiederherstellen auswählen",
         "from_node_name_of_this_cluster": "Von Knoten {name} dieses Clusters",
         "from_different_cluster": "Von einem anderen Cluster",
         "restore": "Wiederherstellen",
@@ -142,7 +142,7 @@
         "column_description": "Beschreibung",
         "network_path_examples": "Netzwerkpfad Beispiel | Netzwerkpfad Beispiele",
         "acl_short_special": "Besonders",
-        "how_to_access_shared_folders_description": "Help users connect to shared folders with the correct path and login format.",
+        "how_to_access_shared_folders_description": "Benutzern helfen eine Verbindung zu freigegebenen Ordnern mit dem richtigen Pfad und dem richtigen Anmeldeformat herzustellen.",
         "username_format_examples": "Benutzername Format Beispiele",
         "search_folder": "Ordner suchen",
         "acl_short_rw": "RW",
@@ -150,14 +150,14 @@
         "acl_short_full": "Vollzugang",
         "acl_short_ro": "RO",
         "column_name": "Ordnername",
-        "enable_recycle_tooltip": "Allow users to recover deleted files on Windows. Deleted items are moved to the 'Recycle Bin' folder and kept until the retention period expires.",
+        "enable_recycle_tooltip": "Benutzern die Wiederherstellung gelöschter Dateien unter Windows ermöglichen. Gelöschte Elemente werden in den Ordner „Papierkorb“ verschoben und dort bis zum Ablauf der Aufbewahrungsfrist aufbewahrt.",
         "recycle_retention_placeholder": "Anzahl Tage",
-        "recycle_versions_title": "When files with the same name are deleted",
+        "recycle_versions_title": "Wenn Dateien mit identischem Namen gelöscht werden",
         "unlimited": "Unbeschränkt",
-        "recycle_retention": "Recycle Bin retention (days)",
+        "recycle_retention": "Aufbewahrungsdauer im Papierkorb (Tage)",
         "edit_shared_folder": "Bearbeite geteilte Ordner",
         "edit": "Bearbeiten",
-        "enable_audit": "Audit logging",
+        "enable_audit": "Audit-Protokoll",
         "browseable": "Ordner in Netzwerk-Übersicht anzeigen",
         "enable_audit_tooltip": "Zeichnet Datei-, Ordner- und Berechtigungsänderungen für Sicherheitsmonitoring und Revision-Audits auf.",
         "browseable_tooltip": "Gibt an, ob ein Ordner in der Netzwerk-Übersicht angezeigt werden soll. Wenn deaktiviert, kann der Ordner nur über den direkten Netzwerkpfad aufgerufen werden.",
@@ -168,7 +168,7 @@
         "enable_recycle": "Gelöschte Dateien im Papierkorb behalten",
         "log_failed_events": "Fehlgeschlagene Ereignisse aufzeichnen",
         "limited": "Eingeschränkt",
-        "recycle_retention_invalid_type": "Invalid type for recycle retention, must be an integer"
+        "recycle_retention_invalid_type": "Ungültiger Typ für die Aufbewahrungsdauer, es muss sich um eine Ganzzahl handeln"
     },
     "ns_combo_search_box": {
         "placeholder": "Suchen",
@@ -187,15 +187,15 @@
         "save_settings": "Einstellungen speichern",
         "not_set": "(nicht gesetzt)",
         "invalid_credentials_description": "Authentifizierung fehlgeschlagen. Es sind Zugangsdaten eines Benutzers der Gruppe 'Domain Admins' erforderlich.",
-        "file_server_alias_tooltip": "Alternative name for the computer, used in network paths to access shared folders. It must be unique in the AD network. Can be up to 15 characters long.",
+        "file_server_alias_tooltip": "Alternativer Name des Computer, der in Netzwerkpfaden für den Zugriff auf freigegebene Ordner verwendet wird. Muss innerhalb des AD-Netzwerks eindeutig sein und darf bis zu 15 Zeichen enthalten.",
         "netbios_domain_name": "NetBIOS Domainname",
-        "file_server_ip_address_tooltip": "IP address to associate with the file server in the Active Directory domain. This cannot be changed if Samba is also a domain provider and other domain providers exist in the same domain.",
+        "file_server_ip_address_tooltip": "IP-Adresse, die dem Dateiserver in der Active Directory-Domäne zugeordnet werden soll. Diese kann nicht geändert werden, wenn Samba ebenfalls als Domänenanbieter fungiert und in derselben Domäne weitere Domänenanbieter vorhanden sind.",
         "file_server_alias": "Dateiserver Alias",
         "ad_admin_username": "AD-Benutzername des Admins",
-        "file_server_name_tooltip": "Unique name for the Active Directory computer account. It will appear in DNS and cannot be changed.",
+        "file_server_name_tooltip": "Eindeutiger Name für das Active Directory Computerkonto. Er wird im DNS angezeigt und kann nicht geändert werden.",
         "domain": "Domain",
         "title": "Einstellungen",
-        "credentials_required_description": "Saving changes requires the credentials of a user in the 'Domain Admins' group."
+        "credentials_required_description": "Zum Speichern der Änderungen sind die Anmeldedaten eines Benutzers aus der Gruppe „Domänenadministratoren“ erforderlich."
     },
     "welcome": {
         "create_file_server": "Dateiserver erstellen",
@@ -204,13 +204,13 @@
         "no_domain_configured_description": "Bitte konfigurieren Sie zuerst eine Active Directory-Domain",
         "no_domain_configured": "Keine Active Directory-Domain konfiguriert",
         "choose_domain": "Domain wählen",
-        "step_settings_description": "Configure the file server identity within the Active Directory domain.",
+        "step_settings_description": "Konfigurieren der Identität des Dateiservers innerhalb der Active Directory-Domäne.",
         "choose_ip_address": "IP-Adresse wählen",
         "step_credentials_description": "Bitte geben Sie die Zugangsdaten für einen Benutzer in der Gruppe 'Domain Admins' ein.",
-        "file_server_alias_tooltip": "Alternative name for the computer, used in network paths to access shared folders. It must be unique in the AD network and can be changed later. Can be up to 15 characters long.",
-        "file_server_ip_address_tooltip": "IP address to associate with the file server in the Active Directory domain. This cannot be changed later if Samba is also a domain provider and other domain providers exist in the same domain.",
+        "file_server_alias_tooltip": "Alternativer Name für den Computer, der in Netzwerkpfaden für den Zugriff auf freigegebene Ordner verwendet wird. Er muss innerhalb des AD-Netzwerks eindeutig sein, kann später geändert werden aber maximal 15 Zeichen beinhalten.",
+        "file_server_ip_address_tooltip": "Die IP-Adresse, die dem Dateiserver in der Active Directory-Domäne zugeordnet werden soll. Diese kann später nicht mehr geändert werden, wenn Samba ebenfalls als Domänenanbieter fungiert und in derselben Domäne weitere Domänenanbieter vorhanden sind.",
         "step_domain_description": "Wählen Sie die Active Directory-Domain aus, der Sie als Mitglied beitreten möchten.",
-        "file_server_name_tooltip": "Unique name for the Active Directory computer account, can be up to 15 characters long. It will appear in DNS and cannot be changed later.",
-        "realm_dc_avail_check_failed": "Active Directory domain discovery failed"
+        "file_server_name_tooltip": "Eindeutiger Name des Active Directory-Computerkonto. Darf maximal 15 Zeichen beinhalten, wird im DNS angezeigt und kann später nicht mehr verändert werden.",
+        "realm_dc_avail_check_failed": "Erkennung der Active Directory-Domäne fehlgeschlagen"
     }
 }
