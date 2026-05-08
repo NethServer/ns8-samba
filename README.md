@@ -304,23 +304,6 @@ Migration is implemented in the `import-module` action.
   the ACL *protected/don't inherit* flag. See [map acl
   inherit](https://www.samba.org/samba/docs/current/man-html/smb.conf.5.html).
 
-## Testing
+## Running tests locally
 
-Test the module using the `test-module.sh` script:
-
-    ./test-module.sh <NODE_ADDR> ghcr.io/nethserver/samba:bug-7537
-
-Additional arguments are forwarded to the `robot` command (see [Robot
-Framework](https://robotframework.org/)).
-
-For instance, to speed up testing on a local machine:
-
-1. Skip the instance removal
-
-       ./test-module.sh 10.5.4.1 ghcr.io/nethserver/samba:bug-7537 --exclude remove
-
-2. Continue to use the Samba instance, skipping the installation steps.
-   The `--variable` option is required to find the existing Samba
-   instance.
-
-       ./test-module.sh 10.5.4.1 ghcr.io/nethserver/samba:bug-7537 --exclude createORremove --variable MID1:samba1
+This module uses the NS8 standard testing infrastructure. For instructions on how to run the test suite locally, refer to the [Running tests locally](https://github.com/NethServer/ns8-github-actions/blob/v1/README.md#running-tests-locally) section of ns8-github-actions.

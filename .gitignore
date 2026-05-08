@@ -1,2 +1,4 @@
 ns8-user-manager-*.tar.gz
 
+# Tests outputs
+tests/outputs/
