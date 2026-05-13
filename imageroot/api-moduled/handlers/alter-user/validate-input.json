@@ -31,7 +31,7 @@
         "display_name": {
             "title": "Display name",
             "type": "string",
-            "maxLength": 32
+            "maxLength": 256
         },
         "password": {
             "title": "New password",
