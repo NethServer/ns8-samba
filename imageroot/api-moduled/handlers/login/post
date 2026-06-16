@@ -48,11 +48,11 @@ def ad_login(request):
         if "Password expired.  You must change it now." in proc_kinit.stdout:
             # Password must be changed immediately: return a token limited to
             # password changing:
-            oclaims["scope"] = ["change-password", "get-password-policy"]
+            oclaims["scope"] = ["change-password", "get-password-policy", "get-password-expiration"]
         else:
             sys.exit(3) # Login failed
     if "Domain Admins" not in oclaims["groups"]:
-        oclaims["scope"] = ["change-password", "get-password-policy"]
+        oclaims["scope"] = ["change-password", "get-password-policy", "get-password-expiration"]
     # Clean up the cache file after a successful login:
     subprocess.run(["podman", "exec", "samba-dc", "rm", "-f", cache_file], text=True, capture_output=True)
     return oclaims
@@ -97,6 +97,7 @@ def api_server_login(request):
             "remove-group",
             "export-users",
             "import-users",
+            "get-password-expiration",
             "list-users",
             "list-groups",
         ],

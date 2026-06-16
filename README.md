@@ -156,6 +156,9 @@ API implementation files are located under
 `.json` files in that directory define API schemas (input/output) using
 JSON Schema. These files describe the request and response formats.
 
+The generated OpenAPI document is available at
+`imageroot/api-moduled/openapi.yaml`.
+
 ## File Server
 
 Any Samba instance (whether its role is `dc` or `member`) can act as a

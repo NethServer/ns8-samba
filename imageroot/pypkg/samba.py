@@ -19,6 +19,8 @@
 #
 
 import ipaddress as ipm
+import datetime
+import re
 import subprocess
 import socket
 import json
@@ -286,6 +288,78 @@ def set_user_account_control(dn_str, user_account_control, no_password_expiratio
         ldbmodify_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-H', '/var/lib/samba/private/sam.ldb']
         ldbmodify_input = f'{dn_str}\nchangetype: modify\nreplace: userAccountControl\nuserAccountControl: {user_account_control}\n'
         subprocess.run(ldbmodify_cmd, input=ldbmodify_input, stdout=sys.stderr, check=True, text=True)
+
+def _filetime_to_datetime(filetime):
+    """Convert a Windows FILETIME (100-nanosecond intervals since 1601-01-01 UTC) to a datetime."""
+    if filetime is None or filetime <= 0:
+        return None
+    return datetime.datetime(1601, 1, 1, tzinfo=datetime.timezone.utc) + \
+        datetime.timedelta(microseconds=int(filetime) // 10)
+
+def get_password_settings():
+    result = subprocess.run(
+        ['podman', 'exec', 'samba-dc', 'samba-tool', 'domain', 'passwordsettings', 'show'],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    password_settings = {
+        'expiration': {
+            'max_age': int(re.search(r'Maximum password age \(days\): (\d.*)\n', result.stdout).group(1)),
+            'min_age': int(re.search(r'Minimum password age \(days\): (\d.*)\n', result.stdout).group(1)),
+        },
+        'strength': {
+            'history_length': int(re.search(r'Password history length: (\d.*)\n', result.stdout).group(1)),
+            'password_min_length': int(re.search(r'Minimum password length: (\d.*)\n', result.stdout).group(1)),
+            'complexity_check': re.search(r'Password complexity: (.*)\n', result.stdout).group(1) == 'on',
+        },
+    }
+
+    password_settings['expiration']['enforced'] = password_settings['expiration']['max_age'] > 0 or \
+                                                  password_settings['expiration']['min_age'] > 0
+    password_settings['strength']['enforced'] = password_settings['strength']['history_length'] > 0 or \
+                                                password_settings['strength']['password_min_length'] > 0 or \
+                                                password_settings['strength']['complexity_check']
+
+    if not password_settings['expiration']['enforced']:
+        password_settings['expiration']['max_age'] = 180
+        password_settings['expiration']['min_age'] = 0
+
+    if not password_settings['strength']['enforced']:
+        password_settings['strength']['history_length'] = 24
+        password_settings['strength']['password_min_length'] = 8
+        password_settings['strength']['complexity_check'] = True
+
+    return password_settings
+
+def get_user_password_expiration(user):
+    accounts = _get_accounts()
+    if user not in accounts:
+        raise KeyError(user)
+
+    rec = accounts[user]
+    if rec[ACTYPE] != 'U':
+        raise KeyError(user)
+
+    password_settings = get_password_settings()
+    must_change = rec[ACPWDLASTSET] is None or rec[ACPWDLASTSET] <= 0
+    no_password_expiration = bool(rec[ACUAC] & 0x10000)
+    expiration = None
+    expired = False
+
+    if not must_change and not no_password_expiration and password_settings['expiration']['enforced']:
+        pwd_last_set = _filetime_to_datetime(rec[ACPWDLASTSET])
+        if pwd_last_set is not None:
+            expiry_date = pwd_last_set + datetime.timedelta(days=password_settings['expiration']['max_age'])
+            expired = datetime.datetime.now(datetime.timezone.utc) > expiry_date
+            expiration = expiry_date.isoformat().replace('+00:00', 'Z')
+
+    return {
+        'expired': expired,
+        'expiration': expiration,
+        'must_change': must_change,
+    }
 
 def get_ad_ldap_suffix() -> str:
     """Returns the LDAP base DN suffix derived from the DOMAIN environment variable.
