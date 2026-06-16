@@ -1,0 +1,41 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "get-password-expiration output",
+    "$id": "http://schema.nethserver.org/ns8-samba/api-moduled/handlers/get-password-expiration/validate-output.json",
+    "type": "object",
+    "required": [
+        "status",
+        "message",
+        "expired",
+        "expiration",
+        "must_change"
+    ],
+    "properties": {
+        "status": {
+            "enum": [
+                "success",
+                "failure"
+            ]
+        },
+        "message": {
+            "type": "string"
+        },
+        "expired": {
+            "type": "boolean"
+        },
+        "expiration": {
+            "anyOf": [
+                {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        },
+        "must_change": {
+            "type": "boolean"
+        }
+    }
+}
