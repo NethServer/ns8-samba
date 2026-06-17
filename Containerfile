@@ -7,21 +7,21 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN set -e \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-        samba=2:4.19.5+dfsg-4ubuntu9.4 \
-        samba-ad-dc=2:4.19.5+dfsg-4ubuntu9.4 \
-        samba-ad-provision=2:4.19.5+dfsg-4ubuntu9.4 \
-        winbind=2:4.19.5+dfsg-4ubuntu9.4 \
+        samba=2:4.19.5+dfsg-4ubuntu9.6 \
+        samba-ad-dc=2:4.19.5+dfsg-4ubuntu9.6 \
+        samba-ad-provision=2:4.19.5+dfsg-4ubuntu9.6 \
+        winbind=2:4.19.5+dfsg-4ubuntu9.6 \
         krb5-user=1.20.1-6ubuntu2.6 \
         iputils-ping=3:20240117-1ubuntu0.1 \
         bzip2=1.0.8-5.1build0.1 \
-        ldb-tools=2:2.8.0+samba4.19.5+dfsg-4ubuntu9.4 \
+        ldb-tools=2:2.8.0+samba4.19.5+dfsg-4ubuntu9.6 \
         chrony=4.5-1ubuntu4.2 \
-        bind9-dnsutils=1:9.18.39-0ubuntu0.24.04.3 \
+        bind9-dnsutils=1:9.18.39-0ubuntu0.24.04.5 \
         acl=2.3.2-1build1.1 \
         attr=1:2.5.2-1build1.1 \
-        smbclient=2:4.19.5+dfsg-4ubuntu9.4 \
-        libnss-winbind=2:4.19.5+dfsg-4ubuntu9.4 \
-        rsync=3.2.7-1ubuntu1.2 \
+        smbclient=2:4.19.5+dfsg-4ubuntu9.6 \
+        libnss-winbind=2:4.19.5+dfsg-4ubuntu9.6 \
+        rsync=3.2.7-1ubuntu1.5 \
         plocate=1.1.19-2ubuntu2 \
         wsdd=2:0.7.1-5 \
         syslog-ng-core=4.3.1-2build5 \
