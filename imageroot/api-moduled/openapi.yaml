@@ -1363,15 +1363,8 @@ components:
           type: boolean
         expiration:
           anyOf:
-          - type: object
-            required:
-            - timestamp
-            - timezone
-            properties:
-              timestamp:
-                type: integer
-              timezone:
-                type: string
+          - type: string
+            format: date-time
           - type: 'null'
         must_change:
           type: boolean
