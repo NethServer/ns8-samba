@@ -29,7 +29,7 @@ buildah run \
     --workingdir=/usr/src/ui \
     --env="NODE_OPTIONS=--openssl-legacy-provider" \
     nodebuilder-samba \
-    sh -c "yarn install && yarn build"
+    sh -c "corepack enable && yarn install && yarn build"
 
 buildah add "${container}" imageroot /imageroot
 buildah add "${container}" ns8-user-manager-${user_manager_version}.tar.gz /imageroot/api-moduled/public
