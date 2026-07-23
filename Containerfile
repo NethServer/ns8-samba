@@ -11,7 +11,7 @@ RUN set -e \
         samba-ad-dc=2:4.19.5+dfsg-4ubuntu9.6 \
         samba-ad-provision=2:4.19.5+dfsg-4ubuntu9.6 \
         winbind=2:4.19.5+dfsg-4ubuntu9.6 \
-        krb5-user=1.20.1-6ubuntu2.6 \
+        krb5-user=1.20.1-6ubuntu2.7 \
         iputils-ping=3:20240117-1ubuntu0.1 \
         bzip2=1.0.8-5.1build0.1 \
         ldb-tools=2:2.8.0+samba4.19.5+dfsg-4ubuntu9.6 \
