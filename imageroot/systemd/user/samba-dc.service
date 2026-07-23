@@ -7,7 +7,7 @@ After=timescaledb.service get-certificate.service
 Type=forking
 Environment=PODMAN_SYSTEMD_UNIT=%n
 EnvironmentFile=/etc/nethserver/agent.env
-EnvironmentFile=%S/state/environment
+EnvironmentFile=%E/state/environment
 Restart=always
 TimeoutStopSec=70
 ExecCondition=bash -c '[[ -n "$$IPADDRESS" ]]'
@@ -53,7 +53,7 @@ ExecStartPost=/usr/bin/bash -c "[[ $$SERVER_ROLE == member ]] || while ! exec 3<
 ExecStop=/usr/bin/podman stop --ignore --cidfile %t/%N.cid -t 10
 ExecStopPost=/usr/bin/podman rm --ignore -f --cidfile %t/%N.cid
 PIDFile=%t/%N.pid
-WorkingDirectory=%S/state
+WorkingDirectory=%E/state
 
 [Install]
 WantedBy=default.target
