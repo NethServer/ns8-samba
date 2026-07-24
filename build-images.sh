@@ -4,7 +4,7 @@ set -e
 images=()
 
 repobase="${REPOBASE:-ghcr.io/nethserver}"
-user_manager_version=v1.2.7
+user_manager_version=v1.2.8
 
 podman build -t ${repobase}/samba-dc .
 images+=("${repobase}/samba-dc")
