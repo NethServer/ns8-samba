@@ -43,13 +43,7 @@
       <cv-column>
         <!-- card grid -->
         <div
-          class="
-            card-grid
-            grid-cols-1
-            sm:grid-cols-2
-            xl:grid-cols-3
-            3xl:grid-cols-4
-          "
+          class="card-grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4"
         >
           <!-- ad domain -->
           <NsInfoCard
