@@ -108,10 +108,7 @@
                     <cv-overflow-menu-item
                       @click="showEditDescriptionModal(row)"
                     >
-                      <NsMenuItem
-                        :icon="Edit20"
-                        :label="$t('shares.edit')"
-                      />
+                      <NsMenuItem :icon="Edit20" :label="$t('shares.edit')" />
                     </cv-overflow-menu-item>
                     <cv-overflow-menu-item
                       @click="showSetPermissionsModal(row)"
