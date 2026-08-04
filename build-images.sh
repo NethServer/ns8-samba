@@ -38,7 +38,7 @@ buildah config \
     --label="org.nethserver.max-per-node=1" \
     --label="org.nethserver.min-core=3.20.1" \
     --label="org.nethserver.volumes=shares homes" \
-    --label "org.nethserver.images=${repobase}/samba-dc:${IMAGETAG:-latest} docker.io/timescale/timescaledb:2.28.3-pg17" \
+    --label "org.nethserver.images=${repobase}/samba-dc:${IMAGETAG:-latest} docker.io/timescale/timescaledb:2.29.0-pg17" \
     --label 'org.nethserver.authorizations=node:fwadm cluster:accountprovider traefik@node:fulladm' \
     --label="org.nethserver.tcp-ports-demand=1" \
     --entrypoint=/ "${container}"
