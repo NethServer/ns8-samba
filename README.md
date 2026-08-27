@@ -127,6 +127,67 @@ To create a new user and assign them to the `developers` group:
     }
     EOF
 
+## Rotate the ldapservice password
+
+The `ldapservice` account is the LDAP bind user of an internal AD domain:
+every module that consumes the domain binds with it, through the local
+`Ldapproxy` instance. Its password is generated once, when the domain is
+created, and can be rotated with the following manual procedure. The
+password is stored in three places, that must be kept in sync:
+
+- the password of the `ldapservice` AD account, which is replicated among
+  the DCs of the domain
+- the `SVCPASS` variable, in the `environment` file of every `samba` module
+  acting as a DC of the domain
+- the `bind_password` field of the `module/<module id>/srv/tcp/ldap` Redis
+  key. This is the key designed to publish the credentials: consumers must
+  read them from here, with the `agent.ldapproxy` package, and never from
+  the `module/<module id>/environment` Redis copy.
+
+Store the new password in the module environment first, so that the next
+command can read it back from the `environment` file. Repeat this on every
+node running a DC of the domain (`samba2`, `samba3`...), with the same
+value. The new password must satisfy the AD password complexity policy:
+
+    runagent -m samba1 python3 -c 'import agent ; agent.set_env("SVCPASS", "NEWPASS")'
+
+Change the password of the AD account. Run this on one DC only:
+replication propagates the change to the other DCs of the domain.
+
+    runagent -m samba1 sh -c 'printf "%s\n%s\n" "${SVCPASS}" "${SVCPASS}" | podman exec -i samba-dc samba-tool user setpassword "${SVCUSER}"'
+
+From this moment consumers bind with a stale password, until the service
+discovery record is updated. Each DC advertises its own record, but they
+are all stored in the same database: as root on the leader node, update the
+record of every `samba` DC module of the domain with `redis-cli`:
+
+    redis-cli HSET module/samba1/srv/tcp/ldap bind_password NEWPASS
+    redis-cli HSET module/samba2/srv/tcp/ldap bind_password NEWPASS
+
+Finally propagate the change with the `user-domain-changed` event, so that
+modules caching the credentials in their own configuration files refresh
+them. One event is enough for the whole cluster:
+
+    redis-cli PUBLISH module/samba1/event/user-domain-changed '{"domain":"ad.dom.test","domains":["ad.dom.test"],"node_id":1}'
+
+If an application does not handle the `user-domain-changed` event correctly,
+it may be necessary to restart it, to pick up the new password.
+
+The `Ldapproxy` instances do not need any reconfiguration, because they are
+L4 proxies and do not bind to the LDAP service themselves. The `samba-dc`
+container does not need a restart either, and AD replication is not
+affected, because DCs authenticate each other with their own machine
+credentials.
+
+A `samba` instance with the `member` role does not use the `ldapservice`
+account at all, and can be ignored by this procedure.
+
+To verify the rotation:
+
+    runagent -m samba1 sh -c 'printf "%s\n" "${SVCPASS}" | podman exec -i samba-dc kinit -c /tmp/rotate-check "${SVCUSER}" && podman exec -i samba-dc kdestroy -c /tmp/rotate-check'
+    redis-cli HGETALL module/samba1/srv/tcp/ldap
+    runagent -m samba1 python3 -c 'import os, agent.ldapproxy ; print(agent.ldapproxy.Ldapproxy().get_domain(os.environ["DOMAIN"]))'
+
 ## User management web portal
 
 When acting as a DC, the Samba module provides a public web portal where
