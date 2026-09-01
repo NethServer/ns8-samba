@@ -13,12 +13,12 @@ RUN set -e \
         winbind=2:4.19.5+dfsg-4ubuntu9.7 \
         krb5-user=1.20.1-6ubuntu2.8 \
         iputils-ping=3:20240117-1ubuntu0.1 \
-        bzip2=1.0.8-5.1build0.1 \
+        bzip2=1.0.8-5.1ubuntu0.1 \
         ldb-tools=2:2.8.0+samba4.19.5+dfsg-4ubuntu9.7 \
         chrony=4.5-1ubuntu4.2 \
-        bind9-dnsutils=1:9.18.39-0ubuntu0.24.04.6 \
+        bind9-dnsutils=1:9.18.39-0ubuntu0.24.04.7 \
         acl=2.3.2-1build1.1 \
-        attr=1:2.5.2-1build1.1 \
+        attr=1:2.5.2-1ubuntu0.1 \
         smbclient=2:4.19.5+dfsg-4ubuntu9.7 \
         libnss-winbind=2:4.19.5+dfsg-4ubuntu9.7 \
         rsync=3.2.7-1ubuntu1.5 \
