@@ -91,3 +91,18 @@ if 'mail' in request:
         ldbedit_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-H', '/var/lib/samba/private/sam.ldb']
         ldbedit_input = f'{dn}\nchangetype: modify\ndelete: mail\n'
     subprocess.run(ldbedit_cmd, input=ldbedit_input, stdout=sys.stderr, check=False, text=True)
+
+if 'phone_extension' in request:
+    phone_extension = request['phone_extension']
+    # retrieve the user's DN, example:
+    # dn: CN=Administrator,CN=Users,DC=ad,DC=leader,DC=cluster0,DC=gs,DC=nethserver,DC=net
+    getdn_cmd = sambatool_cmd + ['user', 'show', user, '--attributes=dn']
+    proc = subprocess.run(getdn_cmd, check=True, capture_output=True, text=True)
+    dn = proc.stdout.strip()
+    if phone_extension != '':
+        ldbedit_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-i', '-H', '/var/lib/samba/private/sam.ldb']
+        ldbedit_input = f'{dn}\nchangetype: modify\nreplace: ipPhone\nipPhone: {phone_extension}\n'
+    else:
+        ldbedit_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-H', '/var/lib/samba/private/sam.ldb']
+        ldbedit_input = f'{dn}\nchangetype: modify\ndelete: ipPhone\n'
+    subprocess.run(ldbedit_cmd, input=ldbedit_input, stdout=sys.stderr, check=False, text=True)
