@@ -544,9 +544,9 @@ def import_users(records: list, skip_existing: bool, progfunc: callable) -> bool
         elif mail_address:
             ldif_prepare(user, 'mail', mail_address)
         if phone_extension == "" and adb[user][ACPHONE] is not None:
-            ldif_prepare(user, 'ipPhone', None, "delete")
+            ldif_prepare(user, 'telephoneNumber', None, "delete")
         elif phone_extension:
-            ldif_prepare(user, 'ipPhone', phone_extension)
+            ldif_prepare(user, 'telephoneNumber', phone_extension)
         if must_change:
             ldif_prepare(user, 'pwdLastSet', 0)
         uac = adb[user][ACUAC]
@@ -716,7 +716,7 @@ def _get_accounts() -> dict:
             'objectClass',
             'pwdLastSet',
             'mail',
-            'ipPhone',
+            'telephoneNumber',
             'displayName',
         ], text=True, stdout=subprocess.PIPE) as proc_ldbsearch:
             record = _make_record()
@@ -754,7 +754,7 @@ def _get_accounts() -> dict:
                     record[ACDISPLAY] = v(ldifline)
                 elif ldifline.startswith("mail:"):
                     record[ACMAIL] = v(ldifline)
-                elif ldifline.startswith("ipPhone:"):
+                elif ldifline.startswith("telephoneNumber:"):
                     record[ACPHONE] = v(ldifline)
                 elif ldifline.startswith("pwdLastSet:"):
                     try:

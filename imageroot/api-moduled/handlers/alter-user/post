@@ -89,10 +89,10 @@ if 'phone_extension' in request:
     dn = proc.stdout.strip()
     if phone_extension != '':
         ldbedit_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-i', '-H', '/var/lib/samba/private/sam.ldb']
-        ldbedit_input = f'{dn}\nchangetype: modify\nreplace: ipPhone\nipPhone: {phone_extension}\n'
+        ldbedit_input = f'{dn}\nchangetype: modify\nreplace: telephoneNumber\ntelephoneNumber: {phone_extension}\n'
     else:
         ldbedit_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-H', '/var/lib/samba/private/sam.ldb']
-        ldbedit_input = f'{dn}\nchangetype: modify\ndelete: ipPhone\n'
+        ldbedit_input = f'{dn}\nchangetype: modify\ndelete: telephoneNumber\n'
     subprocess.run(ldbedit_cmd, input=ldbedit_input, stdout=sys.stderr, check=False, text=True)
 
 json.dump({"status": "success", "message": "user_altered"}, fp=sys.stdout)

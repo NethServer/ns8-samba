@@ -76,7 +76,7 @@ if phone_extension:
     proc = subprocess.run(getdn_cmd, check=True, capture_output=True, text=True)
     dn = proc.stdout.strip()
     ldbedit_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-i', '-H', '/var/lib/samba/private/sam.ldb']
-    ldbedit_input = f'{dn}\nchangetype: modify\nreplace: ipPhone\nipPhone: {phone_extension}\n'
+    ldbedit_input = f'{dn}\nchangetype: modify\nreplace: telephoneNumber\ntelephoneNumber: {phone_extension}\n'
     subprocess.run(ldbedit_cmd, input=ldbedit_input, stdout=sys.stderr, check=True, text=True)
 
 if "no_password_expiration" in request:
