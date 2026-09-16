@@ -64,24 +64,10 @@ if display_name:
     subprocess.run(setname_cmd, stdout=sys.stderr, check=True, text=True)
 
 if mail:
-    # retrieve the user's DN, example:
-    # dn: CN=Administrator,CN=Users,DC=ad,DC=leader,DC=cluster0,DC=gs,DC=nethserver,DC=net
-    getdn_cmd = sambatool_cmd + ['user', 'show', user, '--attributes=dn']
-    proc = subprocess.run(getdn_cmd, check=True, capture_output=True, text=True)
-    dn = proc.stdout.strip()
-    ldbedit_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-i', '-H', '/var/lib/samba/private/sam.ldb']
-    ldbedit_input = f'{dn}\nchangetype: modify\nreplace: mail\nmail: {mail}\n'
-    subprocess.run(ldbedit_cmd, input=ldbedit_input, stdout=sys.stderr, check=True, text=True)
+    samba.set_or_clear_ldap_attribute(user, 'mail', mail)
 
 if phone_extension:
-    # retrieve the user's DN, example:
-    # dn: CN=Administrator,CN=Users,DC=ad,DC=leader,DC=cluster0,DC=gs,DC=nethserver,DC=net
-    getdn_cmd = sambatool_cmd + ['user', 'show', user, '--attributes=dn']
-    proc = subprocess.run(getdn_cmd, check=True, capture_output=True, text=True)
-    dn = proc.stdout.strip()
-    ldbedit_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-i', '-H', '/var/lib/samba/private/sam.ldb']
-    ldbedit_input = f'{dn}\nchangetype: modify\nreplace: telephoneNumber\ntelephoneNumber: {phone_extension}\n'
-    subprocess.run(ldbedit_cmd, input=ldbedit_input, stdout=sys.stderr, check=True, text=True)
+    samba.set_or_clear_ldap_attribute(user, 'telephoneNumber', phone_extension)
 
 if no_password_expiration:
     dn_str, user_account_control = samba.get_user_account_control(user)

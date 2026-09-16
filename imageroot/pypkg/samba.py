@@ -290,6 +290,19 @@ def set_user_account_control(dn_str, user_account_control, no_password_expiratio
         ldbmodify_input = f'{dn_str}\nchangetype: modify\nreplace: userAccountControl\nuserAccountControl: {user_account_control}\n'
         subprocess.run(ldbmodify_cmd, input=ldbmodify_input, stdout=sys.stderr, check=True, text=True)
 
+def set_or_clear_ldap_attribute(user, attribute, value, check=True):
+    sambatool_cmd = ['podman', 'exec', '-i', 'samba-dc', 'samba-tool']
+    getdn_cmd = sambatool_cmd + ['user', 'show', user, '--attributes=dn']
+    proc = subprocess.run(getdn_cmd, check=True, capture_output=True, text=True)
+    dn = proc.stdout.strip()
+    if value:
+        ldbmodify_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-i', '-H', '/var/lib/samba/private/sam.ldb']
+        ldbmodify_input = f'{dn}\nchangetype: modify\nreplace: {attribute}\n{attribute}: {value}\n'
+    else:
+        ldbmodify_cmd = ['podman', 'exec', '-i', 'samba-dc', 'ldbmodify', '-H', '/var/lib/samba/private/sam.ldb']
+        ldbmodify_input = f'{dn}\nchangetype: modify\ndelete: {attribute}\n'
+    subprocess.run(ldbmodify_cmd, input=ldbmodify_input, stdout=sys.stderr, check=check, text=True)
+
 def _filetime_to_datetime(filetime):
     """Convert a Windows FILETIME (100-nanosecond intervals since 1601-01-01 UTC) to a datetime."""
     if filetime is None or filetime <= 0:
