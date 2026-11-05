@@ -15,10 +15,15 @@ images+=("${repobase}/samba-dc")
 container=$(buildah from scratch)
 reponame="samba"
 
+# Node.js 25+ no longer ships Corepack, install it from npm
+# renovate: datasource=npm packageName=corepack
+corepack_version=0.36.0
+
 # Reuse existing nodebuilder-samba container, to speed up builds
 if ! buildah containers --format "{{.ContainerName}}" | grep -q nodebuilder-samba; then
     echo "Pulling NodeJS runtime..."
-    buildah from --name nodebuilder-samba -v "${PWD}:/usr/src:Z" docker.io/library/node:24-slim
+    buildah from --name nodebuilder-samba -v "${PWD}:/usr/src:Z" docker.io/library/node:24.22.2-slim
+    buildah run nodebuilder-samba sh -c "npm install -g corepack@${corepack_version} && corepack enable"
 fi
 
 echo "Downloading user manager ${user_manager_version} UI..."
@@ -29,7 +34,7 @@ buildah run \
     --workingdir=/usr/src/ui \
     --env="NODE_OPTIONS=--openssl-legacy-provider" \
     nodebuilder-samba \
-    sh -c "corepack enable && yarn install && yarn build"
+    sh -c "yarn install && yarn build"
 
 buildah add "${container}" imageroot /imageroot
 buildah add "${container}" ns8-user-manager-${user_manager_version}.tar.gz /imageroot/api-moduled/public
